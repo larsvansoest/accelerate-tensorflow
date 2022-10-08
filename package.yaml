@@ -1,0 +1,96 @@
+name:                template-accelerate
+version:             0.1.0.0
+github:              "githubuser/template-accelerate"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2020 Author name here"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/template-accelerate#readme>
+
+flags:
+  llvm-cpu:
+    description: Generate parallel CPU code
+    manual: true
+    default: false
+  llvm-ptx:
+    description: Generate code for NVIDIA GPUs
+    manual: true
+    default: false
+
+dependencies:
+- base >= 4.7 && < 5
+- accelerate
+# - accelerate-llvm-native
+# - accelerate-llvm-ptx
+
+library:
+  source-dirs: src
+
+executables:
+  template-accelerate:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-n2M
+      - -with-rtsopts=-A64M
+    dependencies:
+      - criterion
+      - gloss
+      - megaparsec
+      - mwc-random
+      - optparse-applicative
+      - template-accelerate
+      - text
+      - vector
+    when:
+      - condition: flag(llvm-cpu)
+        cpp-options: -DACCELERATE_LLVM_NATIVE_BACKEND
+        dependencies:
+          - accelerate-llvm-native
+      - condition: flag(llvm-ptx)
+        cpp-options: -DACCELERATE_LLVM_PTX_BACKEND
+        dependencies:
+          - accelerate-llvm-ptx
+
+tests:
+  template-accelerate-test:
+    main:                Main.hs
+    source-dirs:         test
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-n2M
+      - -with-rtsopts=-A64M
+    dependencies:
+      - template-accelerate
+      - containers
+      - hedgehog
+      - tasty
+      - tasty-hedgehog
+    when:
+      - condition: flag(llvm-cpu)
+        cpp-options: -DACCELERATE_LLVM_NATIVE_BACKEND
+        dependencies:
+          - accelerate-llvm-native
+      - condition: flag(llvm-ptx)
+        cpp-options: -DACCELERATE_LLVM_PTX_BACKEND
+        dependencies:
+          - accelerate-llvm-ptx
+
+# vim: nospell

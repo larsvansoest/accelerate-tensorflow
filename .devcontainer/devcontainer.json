@@ -1,0 +1,43 @@
+{
+    "name": "Accelerate",
+  
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+
+    "extensions": [
+      "haskell.haskell"
+    ],
+
+    "settings": {
+      "haskell.ghcupExecutablePath": "~/.ghcup/bin/ghcup",
+      "haskell.manageHLS": "GHCup",
+      "haskell.toolchain": {
+        "hls": "1.7.0.0",
+        // 1.8.0.0 requires GLIBC 2.32, which is not shipped by Ubuntu 20.04
+        // tracked issue: https://github.com/haskell/haskell-language-server/issues/3160
+        "ghc": "8.10.7"
+        // 8.10.7 is also used by Stack for this template
+      }
+    },
+
+    "remoteUser": "vscode",
+
+    "mounts": [
+      // Mount local ssh files
+      "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+      // Mount stack build cache to volume to improve succeeding builds
+      "source=accelerate-cache,target=/home/vscode/.stack,type=volume",
+      // Configure WSLg display
+      "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
+      "source=/mnt/wslg,target=/mnt/wslg,type=bind"
+    ],
+
+    "containerEnv": {
+      // Configure WSLg display
+      "DISPLAY": ":0",
+      "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
+      "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
+      "PULSE_SERVER": "${localEnv:PULSE_SERVER}"
+    }
+}
