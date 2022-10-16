@@ -7,14 +7,14 @@ packages:
 - completed:
     name: accelerate
     pantry-tree:
-      sha256: 319098d271f976323c328f56c52a33046f25ee86985ba40bd17a13e7e3c40afc
-      size: 18585
-    sha256: 89f32e1d18faaa1bee059adf83987d5a65337ac91540292976b80e0ed53d8b90
-    size: 719083
-    url: https://github.com/tmcdonell/accelerate/archive/5971c5d8e4dbba28d2017e7ce422cf46a20197cb.tar.gz
+      sha256: d020cb22686368cfda73a5830f415e529013af8d48f907506216fcc0696b875d
+      size: 24680
+    sha256: 23772e4cc2760de77f194325dff69c34161be1ae51aa6a594c8f1a6ef03b0e4f
+    size: 4733530
+    url: https://github.com/ivogabe/accelerate/archive/e8beabc99a5d6d62c0e23dadbc354defcff7f1cd.tar.gz
     version: 1.3.0.0
   original:
-    url: https://github.com/tmcdonell/accelerate/archive/5971c5d8e4dbba28d2017e7ce422cf46a20197cb.tar.gz
+    url: https://github.com/ivogabe/accelerate/archive/e8beabc99a5d6d62c0e23dadbc354defcff7f1cd.tar.gz
 - completed:
     name: accelerate-llvm
     pantry-tree:
@@ -94,6 +94,27 @@ packages:
       size: 684
   original:
     hackage: nvvm-0.10.0.0
+- completed:
+    hackage: MIP-0.1.1.0@sha256:37329fd2cc4fb2ed4706007220af63611b3c6f6b8529db6e8cc9ebd1bcfe720e,4450
+    pantry-tree:
+      sha256: 47658a24a179d26b776bbb74042a78264b0e39311150b1d06606305436826c95
+      size: 2372
+  original:
+    hackage: MIP-0.1.1.0
+- completed:
+    hackage: OptDir-0.0.4@sha256:7a59a4e225a1ea402b82377c9057cf258e45d9d7913b2edd010f7ae8b9e4f8af,861
+    pantry-tree:
+      sha256: 1acdb5033f2f1750e622fb4a2bf5f5de5eac9d3129a61c3b92bfed17f64d6607
+      size: 256
+  original:
+    hackage: OptDir-0.0.4
+- completed:
+    hackage: bytestring-encoding-0.1.0.0@sha256:b5bcba36d9c3197ba4707c084b746a9c0124926b1b549d8364ac8895f218a964,1813
+    pantry-tree:
+      sha256: 516a2c51f2bd9764543c0b1f2fd2738ad9098b10ab1748441bc851a6cc949a56
+      size: 713
+  original:
+    hackage: bytestring-encoding-0.1.0.0
 snapshots:
 - completed:
     sha256: ce4fb8d44f3c6c6032060a02e0ebb1bd29937c9a70101c1517b92a87d9515160

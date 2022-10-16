@@ -10,8 +10,8 @@ packages:
 - .
 
 extra-deps:
-- github: tmcdonell/accelerate
-  commit: 5971c5d8e4dbba28d2017e7ce422cf46a20197cb
+- github: ivogabe/accelerate
+  commit: e8beabc99a5d6d62c0e23dadbc354defcff7f1cd
 
 - github: AccelerateHS/accelerate-llvm
   commit: 2cd65569c875477b5250d54f0d0738d8ee28e597
@@ -28,6 +28,9 @@ extra-deps:
 
 - cuda-0.11.0.0
 - nvvm-0.10.0.0
+- MIP-0.1.1.0
+- OptDir-0.0.4
+- bytestring-encoding-0.1.0.0
 
 # Override default flag values for local packages and extra-deps
 flags:
