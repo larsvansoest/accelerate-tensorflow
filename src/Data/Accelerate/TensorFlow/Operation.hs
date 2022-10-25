@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns         #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -23,6 +24,9 @@ import Data.Array.Accelerate.Representation.Shape (shapeType)
 import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.Trafo.Operation.Substitution
 import Data.Array.Accelerate.AST.Environment
+import Data.Array.Accelerate.Representation.Ground
+import Data.Array.Accelerate.Trafo.Desugar
+import Data.Array.Accelerate.Trafo.Exp.Substitution
 
 data TensorOp op where
   TConst :: ScalarType s -> s -> TensorOp (Out sh s -> ())
@@ -35,68 +39,95 @@ instance PrettyOp TensorOp where
 instance NFData' TensorOp where
   rnf' !_ = ()
 
-mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
-mapXTimesTwoPlusOne
-  (
-    ArgArray _ arrayR@(ArrayR sh _)
-    gvIn
-    gvbIn
-  )
-  argOut@(
-    ArgArray _ _
-    gvOut
-    gvbOut
-  )
+mapXTimesTwoPlusOne' :: forall env sh s t. Arg env (In sh Int64) -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
+mapXTimesTwoPlusOne' (ArgArray _ arrayR@(ArrayR sh ty) gvIn gvbIn) argOut
+  | DeclareVars lhs  w  k  <- declareVars $ buffersR ty
+  , DeclareVars lhs' w' k' <- declareVars $ buffersR ty
   = let
-      tInt64 :: NumType Int64
-      tInt64 = IntegralNumType TypeInt64
+    nInt64 :: NumType Int64
+    nInt64 = IntegralNumType TypeInt64
+    sInt64 :: ScalarType Int64
+    sInt64 = SingleScalarType (NumSingleType nInt64)
+    bInt64 :: GroundR (Buffer Int64)
+    bInt64 = GroundRbuffer sInt64
+    arrayR' :: ArrayR (Array sh (Int64, Int64))
+    arrayR' = ArrayR sh $ TupRpair (TupRsingle sInt64) (TupRsingle sInt64)
+  in aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
+     Alet (LeftHandSideWildcard TupRunit) TupRunit 
+       (Exec (TConst sInt64 2) (ArgArray Out (ArrayR sh (TupRsingle sInt64)) (weakenVars w gvIn) (weakenVars w gvbIn) :>: ArgsNil)) $
+         Alet (LeftHandSideWildcard TupRunit) TupRunit
+           (Exec (TPrimFun (PrimMul nInt64)) (ArgArray In arrayR' (weakenVars w gvIn) (TupRpair (weakenVars w gvbIn) (k weakenId)) :>: weaken w argOut :>: ArgsNil)) $ 
+             aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $ 
+               Alet (LeftHandSideWildcard TupRunit) TupRunit 
+                 (Exec (TConst sInt64 1) (ArgArray Out (ArrayR sh (TupRsingle sInt64)) (weakenVars (w' .> w) gvIn) (weakenVars (w' .> w) gvbIn) :>: ArgsNil)) $ 
+                   Exec (TPrimFun (PrimAdd nInt64)) (ArgArray In arrayR' (weakenVars (w' .> w) gvIn) (TupRpair (weakenVars (w' .> w) gvbIn) (k' weakenId)) :>: weaken (w' .> w) argOut :>: ArgsNil)
 
-      timesOp = TPrimFun (PrimMul tInt64)
-      plusOp  = TPrimFun (PrimAdd tInt64) -- Todo: include
+mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
+mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh _) gvIn gvbIn) argOut = let
+  nInt64 :: NumType Int64
+  nInt64 = IntegralNumType TypeInt64
 
-      tNewIn :: TupR ScalarType (Int64, Int64)
-      tNewIn = TupRpair
-        (TupRsingle (SingleScalarType (NumSingleType tInt64)))
-        (TupRsingle (SingleScalarType (NumSingleType tInt64)))
+  sInt64 :: ScalarType Int64
+  sInt64 = SingleScalarType (NumSingleType nInt64)
 
-      -- getNewGvbIn :: GroundVars env (Buffers Int64) -> GroundVars env (Buffers (Int64, Int64))
-      -- getNewGvbIn TupRunit = Alet 
-      -- getNewGvbIn (TupRsingle _) = _
-      -- getNewGvbIn (TupRpair _ _) = _
+  bInt64 :: GroundR (Buffer Int64)
+  bInt64 = GroundRbuffer sInt64
 
-      tNewOut :: TupR ScalarType Int64
-      tNewOut = TupRsingle (SingleScalarType (NumSingleType tInt64))
+  arrayR' :: ArrayR (Array sh (Int64, Int64))
+  arrayR' = ArrayR sh $ TupRpair (TupRsingle sInt64) (TupRsingle sInt64)
 
-      newGvbOut :: TupR (Var GroundR env) (Buffer Int64)
-      newGvbOut = undefined
+  gvIn' :: TupR (Var GroundR (env, Buffer Int64)) sh
+  gvIn' = mapTupR (weaken (weakenSucc weakenId)) gvIn
 
-      int64Buffer :: GroundR (Buffer Int64)
-      int64Buffer = GroundRbuffer $ SingleScalarType (NumSingleType tInt64)
+  gvIn'' :: TupR (Var GroundR ((env, Buffer Int64), Buffer Int64)) sh
+  gvIn'' = mapTupR (weaken (weakenSucc weakenId)) gvIn'
 
-      gvIn' :: TupR (Var GroundR (env, Buffer Int64)) sh
-      gvIn' = mapTupR (weaken (weakenSucc weakenId)) gvIn
+  varToI0 :: forall env. TupR (Var GroundR (env, Buffer Int64)) (Buffer Int64)
+  varToI0 = TupRsingle $ Var bInt64 ZeroIdx
 
-    -- in Exec timesOp (
-    --   ArgArray In (ArrayR shIn tNewIn) gvIn (getNewGvbIn gvbIn)
-    --   :>: ArgArray Out (ArrayR shOut tNewOut) gvOut newGvbOut
-    --   :>: ArgsNil
-    -- )
-    in -- eerst nieuwe buffer aanmaken, eerst array aanmaken van zelfde grootte
-       Alet -- kan je gebruiken voor nieuwe variabelen of side effects uitvoeren en dan doorgaan met iets anders
-        (LeftHandSideSingle int64Buffer) -- variable introduceren
-        (TupRsingle Unique) -- uniqueness van nieuwe variabele
-        (Alloc sh (SingleScalarType (NumSingleType tInt64)) (groundToExpVar (shapeType sh) gvIn))
-        -- array vullen met tweeën
-        $ Alet (LeftHandSideWildcard TupRunit)
-          TupRunit 
-          (Exec 
-            (TConst (SingleScalarType (NumSingleType tInt64)) 2) 
-            (ArgArray Out arrayR gvIn' (TupRsingle $ Var int64Buffer ZeroIdx) :>: ArgsNil) -- (TupRsingle $ Var int64Buffer ZeroIdx) refereert naar een array
-          ) 
-          -- keer twee
-          $ Exec 
-            (TPrimFun (PrimMul tInt64)) 
-            (ArgArray In (ArrayR sh tNewIn) gvIn' (TupRpair (mapTupR (weaken (weakenSucc weakenId)) gvbIn) (TupRsingle $ Var int64Buffer ZeroIdx)) :>: weaken (weakenSucc weakenId) argOut :>: ArgsNil) 
+  gvbIn' :: TupR (Var GroundR (env, Buffer Int64)) (Buffer Int64, Buffer Int64)
+  gvbIn' = TupRpair (mapTupR (weaken (weakenSucc weakenId)) gvbIn) varToI0
+
+  gvbIn'' :: TupR (Var GroundR ((env, Buffer Int64), Buffer Int64)) (Buffer Int64, Buffer Int64)
+  gvbIn'' = TupRpair (mapTupR (weaken (weakenSucc weakenId)) (mapTupR (weaken (weakenSucc weakenId)) gvbIn)) varToI0
+
+  argOut' :: Arg (env, Buffer Int64) (Out sh Int64)
+  argOut' = weaken (weakenSucc weakenId) argOut
+  in -- eerst nieuwe buffer aanmaken, eerst array aanmaken van zelfde grootte
+    Alet -- kan je gebruiken voor nieuwe variabelen of side effects uitvoeren en dan doorgaan met iets anders
+    (LeftHandSideSingle bInt64) -- variable introduceren
+    (TupRsingle Unique) -- uniqueness van nieuwe variabele
+    (Alloc sh sInt64 (groundToExpVar (shapeType sh) gvIn))
+    -- array vullen met tweeën
+    $ Alet (LeftHandSideWildcard TupRunit)
+      TupRunit 
+      (Exec (TConst sInt64 2) (ArgArray Out arrayR gvIn' varToI0 :>: ArgsNil)) -- (TupRsingle $ Var int64Buffer ZeroIdx) refereert naar een array
+      -- keer twee
+      $ Alet (LeftHandSideWildcard TupRunit)
+        TupRunit
+        (Exec 
+          (TPrimFun (PrimMul nInt64)) 
+          (ArgArray In arrayR' gvIn' gvbIn' :>: argOut' :>: ArgsNil)
+        )
+        -- nieuwe array aanmaken van zelfde grootte
+        $ Alet
+            (LeftHandSideSingle bInt64)
+            (TupRsingle Unique)
+            (Alloc sh sInt64 (groundToExpVar (shapeType sh) gvIn'))
+            -- array vullen met 1'en
+            $ Alet (LeftHandSideWildcard TupRunit)
+              TupRunit
+              ( Exec
+                (TConst sInt64 1) 
+                (ArgArray Out arrayR gvIn'' varToI0 :>: ArgsNil)
+              )
+              -- plus 1
+              $ Exec
+                  (TPrimFun (PrimAdd nInt64))
+                  (ArgArray In arrayR' gvIn'' gvbIn''
+                    :>: weaken (weakenSucc weakenId) argOut'
+                    :>: ArgsNil
+                  )
 
 -- voor het dynamisch toevoegen van nieuwe variabelen: zie Trafo/Vars.hs => declareVars, gebruik pattern matching in guards
 -- e.g.  | DeclareVars lhs w k <- declareVars $ buffersR (TupRpair ty1 ty2) =
