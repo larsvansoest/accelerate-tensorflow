@@ -131,7 +131,7 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh _) gvIn gvbIn) argOut = let
                   )
 
 instance DesugarAcc TensorOp where
-  mkMap (ArgFun (Lam lhs (Body body))) _ aOut = mkMapF body aOut 
+  mkMap (ArgFun (Lam lhs (Body body))) _ aOut = mkMapF _ body aOut 
   -- lhs nodig bij het gebruik van een variabele (e.g. Let, Evar), lhs geef je Env mee
   mkMap _ _ _ = error "impossible"
 
@@ -160,22 +160,27 @@ data BufferIdx benv a where
 concatBufferIdx :: Env (BufferIdx benv) a -> Env (BufferIdx benv) b -> Env (BufferIdx benv) b
 concatBufferIdx = undefined
 
-mkMapF :: forall env env' sh t. PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
-mkMapF (Const s e) aOut = Exec (TConst s e) $ aOut :>: ArgsNil
+mkMapF :: forall env env' benv sh t. Env (BufferIdx benv) env' -> PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+mkMapF _ (Const s e) aOut = Exec (TConst s e) $ aOut :>: ArgsNil
 
-mkMapF (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
+mkMapF env (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp
- , arrayR <- ArrayR sh a
  , DeclareVars lhs w k <- declareVars $ buffersR a
- = aletUnique lhs (desugarAlloc arrayR (fromGrounds gv)) $
-   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenArrayInstr w exp) (ArgArray Out arrayR (weakenVars w gv) (k weakenId))) $
-   Exec (TPrimFun f) (ArgArray In arrayR (weakenVars w gv) (k weakenId) :>: weaken w aOut :>: ArgsNil)
+ = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
+   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF env (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))) $
+   Exec (TPrimFun f) (ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>: weaken w aOut :>: ArgsNil)
 
-mkMapF (Let lhs exp1 exp2) (ArgArray _ _ _ gvb) = let
-  --test = lhsToEnv lhs (weakenVars (weakenWithLHS lhs) gvb)
-  in undefined
+mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh t) gv gvb)
+ | a1 <- expType exp1
+ , a2 <- expType exp2
+ , DeclareVars lhs1 w1 k1 <- declareVars $ buffersR a1
+ , DeclareVars lhs2 w2 k2 <- declareVars $ buffersR a2
+ = aletUnique lhs1 (desugarAlloc (ArrayR sh a1) (fromGrounds gv)) $ 
+   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF env (weakenArrayInstr w1 exp1) (ArgArray Out (ArrayR sh a1) (weakenVars w1 gv) (k1 weakenId))) $ 
+   aletUnique lhs2 (desugarAlloc (ArrayR sh a2) (fromGrounds (weakenVars w1 gv))) $ 
+   mkMapF (lhsToEnv env elhs _) (weakenArrayInstr (w2 .> w1) exp2) (ArgArray Out (ArrayR sh a2) (weakenVars (w2 .> w1) gv) (k2 weakenId))
 
-mkMapF _ _ = undefined
+mkMapF _ _ _ = undefined
 
 lhsToEnv :: forall a env env' benv sh.
   Env (BufferIdx benv) env
