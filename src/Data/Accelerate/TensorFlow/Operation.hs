@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns         #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -20,13 +20,14 @@ import Data.Array.Accelerate.Type
 import Data.Array.Accelerate.Representation.Array
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Trafo.Var
-import Data.Array.Accelerate.Representation.Shape (shapeType)
+import Data.Array.Accelerate.Representation.Shape (shapeType, ShapeR)
 import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.Trafo.Operation.Substitution
 import Data.Array.Accelerate.AST.Environment
 import Data.Array.Accelerate.Representation.Ground
 import Data.Array.Accelerate.Trafo.Desugar
 import Data.Array.Accelerate.Trafo.Exp.Substitution
+import Data.Type.Equality
 
 data TensorOp op where
   TConst :: ScalarType s -> s -> TensorOp (Out sh s -> ())
@@ -137,12 +138,29 @@ instance DesugarAcc TensorOp where
   mkGenerate = undefined
   mkPermute = undefined
 
-data BufferIdx a b where
+data BufferIdx benv a where
+  BufferIdx :: Idx benv (Buffer a) -> BufferIdx benv a
 
-lhsToEnv :: ELeftHandSide a () env' -> Arg env (In sh a) -> Env (BufferIdx env) env'
-lhsToEnv = undefined
 
-mkMapF :: PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+
+-- lhsToEnv (LeftHandSideSingle s) (TupRsingle (Var _ idx))
+--   | Refl <- reprIsSingle @ScalarType @a @Buffer s
+--   = Push Empty (BufferIdx idx)
+
+-- lhsToEnv (LeftHandSidePair l1 l2) (TupRpair t1 t2)
+--   = lhsToEnv l1 t1 `concatBufferIdx` lhsToEnv l2 t2
+
+-- lhsToEnv (LeftHandSideWildcard _) _ = undefined
+
+-- lhsToEnv _ _ = error "impossible"
+
+
+
+
+concatBufferIdx :: Env (BufferIdx benv) a -> Env (BufferIdx benv) b -> Env (BufferIdx benv) b
+concatBufferIdx = undefined
+
+mkMapF :: forall env env' sh t. PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
 mkMapF (Const s e) aOut = Exec (TConst s e) $ aOut :>: ArgsNil
 
 mkMapF (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
@@ -153,9 +171,23 @@ mkMapF (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
    Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenArrayInstr w exp) (ArgArray Out arrayR (weakenVars w gv) (k weakenId))) $
    Exec (TPrimFun f) (ArgArray In arrayR (weakenVars w gv) (k weakenId) :>: weaken w aOut :>: ArgsNil)
 
-mkMapF (Let lhs exp1 exp2) aOut = undefined
+mkMapF (Let lhs exp1 exp2) (ArgArray _ _ _ gvb) = let
+  --test = lhsToEnv lhs (weakenVars (weakenWithLHS lhs) gvb)
+  in undefined
 
 mkMapF _ _ = undefined
+
+lhsToEnv :: forall a env env' benv sh.
+  Env (BufferIdx benv) env
+  -> ELeftHandSide a env env'
+  -> TupR (Var GroundR benv) (Buffers a) 
+  -> Env (BufferIdx benv) env'
+lhsToEnv env (LeftHandSideSingle s) (TupRsingle (Var _ idx))
+  | Refl <- reprIsSingle @ScalarType @a @Buffer s
+  = Push env (BufferIdx idx)
+lhsToEnv env (LeftHandSidePair l1 l2) (TupRpair t1 t2) = lhsToEnv (lhsToEnv env l1 t1) l2 t2
+lhsToEnv env (LeftHandSideWildcard _) _ = env
+lhsToEnv _ _ _ = error "impossible"
 
 -- let evar, pair nil, play around with zipwith or fold
 
