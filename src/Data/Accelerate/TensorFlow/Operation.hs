@@ -53,13 +53,13 @@ mapXTimesTwoPlusOne' (ArgArray _ arrayR@(ArrayR sh ty) gvIn gvbIn) argOut
     arrayR' :: ArrayR (Array sh (Int64, Int64))
     arrayR' = ArrayR sh $ TupRpair (TupRsingle sInt64) (TupRsingle sInt64)
   in aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
-     Alet (LeftHandSideWildcard TupRunit) TupRunit 
+     Alet (LeftHandSideWildcard TupRunit) TupRunit
        (Exec (TConst sInt64 2) (ArgArray Out (ArrayR sh (TupRsingle sInt64)) (weakenVars w gvIn) (weakenVars w gvbIn) :>: ArgsNil)) $
          Alet (LeftHandSideWildcard TupRunit) TupRunit
-           (Exec (TPrimFun (PrimMul nInt64)) (ArgArray In arrayR' (weakenVars w gvIn) (TupRpair (weakenVars w gvbIn) (k weakenId)) :>: weaken w argOut :>: ArgsNil)) $ 
-             aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $ 
-               Alet (LeftHandSideWildcard TupRunit) TupRunit 
-                 (Exec (TConst sInt64 1) (ArgArray Out (ArrayR sh (TupRsingle sInt64)) (weakenVars (w' .> w) gvIn) (weakenVars (w' .> w) gvbIn) :>: ArgsNil)) $ 
+           (Exec (TPrimFun (PrimMul nInt64)) (ArgArray In arrayR' (weakenVars w gvIn) (TupRpair (weakenVars w gvbIn) (k weakenId)) :>: weaken w argOut :>: ArgsNil)) $
+             aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $
+               Alet (LeftHandSideWildcard TupRunit) TupRunit
+                 (Exec (TConst sInt64 1) (ArgArray Out (ArrayR sh (TupRsingle sInt64)) (weakenVars (w' .> w) gvIn) (weakenVars (w' .> w) gvbIn) :>: ArgsNil)) $
                    Exec (TPrimFun (PrimAdd nInt64)) (ArgArray In arrayR' (weakenVars (w' .> w) gvIn) (TupRpair (weakenVars (w' .> w) gvbIn) (k' weakenId)) :>: weaken (w' .> w) argOut :>: ArgsNil)
 
 mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
@@ -100,13 +100,13 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh _) gvIn gvbIn) argOut = let
     (Alloc sh sInt64 (groundToExpVar (shapeType sh) gvIn))
     -- array vullen met tweeën
     $ Alet (LeftHandSideWildcard TupRunit)
-      TupRunit 
+      TupRunit
       (Exec (TConst sInt64 2) (ArgArray Out arrayR gvIn' varToI0 :>: ArgsNil)) -- (TupRsingle $ Var int64Buffer ZeroIdx) refereert naar een array
       -- keer twee
       $ Alet (LeftHandSideWildcard TupRunit)
         TupRunit
-        (Exec 
-          (TPrimFun (PrimMul nInt64)) 
+        (Exec
+          (TPrimFun (PrimMul nInt64))
           (ArgArray In arrayR' gvIn' gvbIn' :>: argOut' :>: ArgsNil)
         )
         -- nieuwe array aanmaken van zelfde grootte
@@ -118,7 +118,7 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh _) gvIn gvbIn) argOut = let
             $ Alet (LeftHandSideWildcard TupRunit)
               TupRunit
               ( Exec
-                (TConst sInt64 1) 
+                (TConst sInt64 1)
                 (ArgArray Out arrayR gvIn'' varToI0 :>: ArgsNil)
               )
               -- plus 1
@@ -129,46 +129,42 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh _) gvIn gvbIn) argOut = let
                     :>: ArgsNil
                   )
 
--- voor het dynamisch toevoegen van nieuwe variabelen: zie Trafo/Vars.hs => declareVars, gebruik pattern matching in guards
--- e.g.  | DeclareVars lhs w k <- declareVars $ buffersR (TupRpair ty1 ty2) =
-
--- mkMapF :: Arg env (Fun' (s -> t)) -> Arg env (In sh s) -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
--- Constant values
--- mkMapF (ArgFun (Body (Const s e)))   _ _ = Exec (TConst s e) ArgsNil
--- mkMapF (ArgFun (Body (PrimConst _))) _ _ = undefined
--- -- Primitive scalar operations
--- mkMapF (ArgFun (Body (PrimApp f exp))) (ArgArray m (ArrayR sh tR) g b) o
---   = Exec (TPrimFun f) (ArgArray m (ArrayR sh _) g _ :>: _ :>: ArgsNil)
-
--- mkMapF (ArgFun (Body (ArrayInstr _ _))) input output = undefined
-
--- Others
--- mkMapF (ArgFun (Body (Let _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (Evar _))) input output = undefined
--- mkMapF (ArgFun (Body (Foreign _ _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (VecUnpack _ _))) input output = undefined
--- mkMapF (ArgFun (Body (IndexSlice _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (IndexFull _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (FromIndex _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (Case _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (Cond _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (While _ _ _))) input output = undefined
--- mkMapF (ArgFun (Body (Undef _))) input output = undefined
--- mkMapF (ArgFun (Body (Coerce _ _ _))) input output = undefined
--- mkMapF (ArgFun (Lam (LeftHandSideSingle (SingleScalarType (NumSingleType (IntegralNumType _)))) f)) input output = undefined
--- mkMapF (ArgFun (Lam (LeftHandSideSingle (SingleScalarType (NumSingleType (FloatingNumType _)))) f)) input output = undefined
--- mkMapF (ArgFun (Lam (LeftHandSideSingle (VectorScalarType _)) f)) input output = undefined
--- mkMapF (ArgFun (Lam (LeftHandSideWildcard _) f)) input output = undefined
--- mkMapF (ArgFun (Lam (LeftHandSidePair _ _) f)) input output = undefined
-
--- -- Redundant pattern matches
--- mkMapF (ArgFun (Body (Pair _ _))) input output = undefined
--- mkMapF (ArgFun (Body Nil)) input output = undefined
--- mkMapF (ArgFun (Body (VecPack _ _))) input output = undefined
--- mkMapF (ArgFun (Body (ShapeSize _ _))) input output = undefined
--- mkMapF (ArgFun (Body (ToIndex _ _ _))) input output = undefined
-
 instance DesugarAcc TensorOp where
-  mkMap = undefined
+  mkMap (ArgFun (Lam lhs (Body body))) _ aOut = mkMapF body aOut 
+  -- lhs nodig bij het gebruik van een variabele (e.g. Let, Evar), lhs geef je Env mee
+  mkMap _ _ _ = error "impossible"
+
   mkGenerate = undefined
   mkPermute = undefined
+
+data BufferIdx a b where
+
+lhsToEnv :: ELeftHandSide a () env' -> Arg env (In sh a) -> Env (BufferIdx env) env'
+lhsToEnv = undefined
+
+mkMapF :: PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+mkMapF (Const s e) aOut = Exec (TConst s e) $ aOut :>: ArgsNil
+
+mkMapF (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
+ | a <- expType exp
+ , arrayR <- ArrayR sh a
+ , DeclareVars lhs w k <- declareVars $ buffersR a
+ = aletUnique lhs (desugarAlloc arrayR (fromGrounds gv)) $
+   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenArrayInstr w exp) (ArgArray Out arrayR (weakenVars w gv) (k weakenId))) $
+   Exec (TPrimFun f) (ArgArray In arrayR (weakenVars w gv) (k weakenId) :>: weaken w aOut :>: ArgsNil)
+
+mkMapF (Let lhs exp1 exp2) aOut = undefined
+
+mkMapF _ _ = undefined
+
+-- let evar, pair nil, play around with zipwith or fold
+
+-- 0.1.2.3.4.5.6
+
+-- mkMapBody (PrimApp f exp) aOut
+--  | DeclareVars lhs w k  <- declareVars $ buffersR ty 
+--  = aletUnique lhs (mkMapBody exp aOut) $ -- alloc gebruiken -> output voor mkmap body exp -> invoer voor volgende exec
+--    Exec (TPrimFun f) $ ArgArray In _ _ _ :>: aOut :>: ArgsNil
+-- mkMapBody _ _ _ = undefined
+
+
