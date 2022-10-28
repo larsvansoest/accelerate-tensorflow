@@ -6,6 +6,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use record patterns" #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -23,13 +27,18 @@ import Data.Array.Accelerate.Representation.Ground
 import Data.Array.Accelerate.Trafo.Desugar
 import Data.Array.Accelerate.Trafo.Exp.Substitution
 import Data.Type.Equality
+import Data.Array.Accelerate.Lifetime
+import Foreign
+import Data.Array.Accelerate.AST.Kernel (NoKernelMetadata)
 
 data TensorOp op where
+  TNil :: TensorOp ()
   TConst :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
   TVar :: ScalarType s -> Idx env (Buffer s) -> TensorOp (Out sh s -> ())
 
 instance PrettyOp TensorOp where
+  prettyOp TNil = "TNil"
   prettyOp (TConst s _) = "TTensor"
   prettyOp (TPrimFun _) = "TBinOp"
   prettyOp (TVar _ _)   = "TVar"
@@ -89,4 +98,48 @@ mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
    mkMapF (addLHSToBIEnv (weakenBIEnv w env) elhs (k weakenId)) (weakenArrayInstr w exp2) (weaken w aOut)
 
 mkMapF env (Evar (Var s idx)) aOut = Exec (TVar s (lookupBIEnv idx env)) $ aOut :>: ArgsNil
-mkMapF _ _ _ = undefined
+
+mkMapF env (Pair exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv gvb)
+ = undefined -- TODO implement
+
+-- TODO
+
+mkMapF _ (Foreign _ _ _ _) _ = undefined
+mkMapF _ Nil _ = undefined
+mkMapF _ (VecPack _ _) _ = undefined
+mkMapF _ (VecUnpack _ _) _ = undefined
+mkMapF _ (IndexSlice _ _ _) _ = undefined
+mkMapF _ (IndexFull _ _ _) _ = undefined
+mkMapF _ (ToIndex _ _ _) _ = undefined
+mkMapF _ (FromIndex _ _ _) _ = undefined
+mkMapF _ (Case _ _ _) _ = undefined
+mkMapF _ (Cond _ _ _) _ = undefined
+mkMapF _ (While _ _ _) _ = undefined
+mkMapF _ (PrimConst _) _ = undefined
+mkMapF _ (ArrayInstr _ _) _ = undefined
+mkMapF _ (ShapeSize _ _) _ = undefined
+mkMapF _ (Undef _) _ = undefined
+mkMapF _ (Coerce _ _ _) _ = undefined
+
+-- temp kernel for testing purposes
+
+data TensorFlowKernel env where
+  TensorFlowKernel
+    :: { kernelId       :: Int
+       , kernelFunction :: !(Lifetime (FunPtr  env))
+       }
+    -> TensorFlowKernel env
+
+instance NFData' TensorFlowKernel where
+  rnf' (TensorFlowKernel !_ fn) = unsafeGetValue fn `seq` ()
+
+newtype TensorFlowKernelMetadata f =
+  TensorFlowKernelMetadata { kernelArgsSize :: Int }
+
+instance IsKernel TensorFlowKernel where
+  type KernelOperation TensorFlowKernel = TensorOp
+  type KernelMetadata  TensorFlowKernel = NoKernelMetadata
+  compileKernel = undefined
+
+instance PrettyKernel TensorFlowKernelMetadata where
+  prettyKernel = PrettyKernelBody True $ \_ kernel -> ""
