@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -131,65 +132,53 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh _) gvIn gvbIn) argOut = let
                   )
 
 instance DesugarAcc TensorOp where
-  mkMap (ArgFun (Lam lhs (Body body))) _ aOut = mkMapF _ body aOut 
+  mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ _ _ gvb) aOut = mkMapF (lhsToEnv Empty lhs gvb) body aOut 
   -- lhs nodig bij het gebruik van een variabele (e.g. Let, Evar), lhs geef je Env mee
   mkMap _ _ _ = error "impossible"
 
   mkGenerate = undefined
   mkPermute = undefined
 
-data BufferIdx benv a where
-  BufferIdx :: Idx benv (Buffer a) -> BufferIdx benv a
+data BIdx env a where
+  BIdx  :: Idx env (Buffer a) -> BIdx env a
+  -- Empty :: Idx env () -> BIdx env a
+  -- Push  :: BIdx env a -> env t -> BIdx env (a, t)
 
+instance Sink BIdx where
+  weaken w (BIdx idx) = BIdx $ weaken w idx
 
+type BIEnv env = Env (BIdx env)
 
--- lhsToEnv (LeftHandSideSingle s) (TupRsingle (Var _ idx))
---   | Refl <- reprIsSingle @ScalarType @a @Buffer s
---   = Push Empty (BufferIdx idx)
+weakenBIEnv :: forall benv benv' env. benv :> benv' -> BIEnv benv env -> BIEnv benv' env
+weakenBIEnv w = mapEnv (weaken w)
 
--- lhsToEnv (LeftHandSidePair l1 l2) (TupRpair t1 t2)
---   = lhsToEnv l1 t1 `concatBufferIdx` lhsToEnv l2 t2
-
--- lhsToEnv (LeftHandSideWildcard _) _ = undefined
-
--- lhsToEnv _ _ = error "impossible"
-
-
-
-
-concatBufferIdx :: Env (BufferIdx benv) a -> Env (BufferIdx benv) b -> Env (BufferIdx benv) b
-concatBufferIdx = undefined
-
-mkMapF :: forall env env' benv sh t. Env (BufferIdx benv) env' -> PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+mkMapF :: forall env env' sh t. BIEnv env env' -> PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
 mkMapF _ (Const s e) aOut = Exec (TConst s e) $ aOut :>: ArgsNil
 
 mkMapF env (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp
  , DeclareVars lhs w k <- declareVars $ buffersR a
  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
-   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF env (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))) $
+   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenBIEnv w env) (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))) $
    Exec (TPrimFun f) (ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>: weaken w aOut :>: ArgsNil)
 
-mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh t) gv gvb)
- | a1 <- expType exp1
- , a2 <- expType exp2
- , DeclareVars lhs1 w1 k1 <- declareVars $ buffersR a1
- , DeclareVars lhs2 w2 k2 <- declareVars $ buffersR a2
- = aletUnique lhs1 (desugarAlloc (ArrayR sh a1) (fromGrounds gv)) $ 
-   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF env (weakenArrayInstr w1 exp1) (ArgArray Out (ArrayR sh a1) (weakenVars w1 gv) (k1 weakenId))) $ 
-   aletUnique lhs2 (desugarAlloc (ArrayR sh a2) (fromGrounds (weakenVars w1 gv))) $ 
-   mkMapF (lhsToEnv env elhs _) (weakenArrayInstr (w2 .> w1) exp2) (ArgArray Out (ArrayR sh a2) (weakenVars (w2 .> w1) gv) (k2 weakenId))
+mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
+ | a <- expType exp1
+ , DeclareVars lhs w k <- declareVars $ buffersR a
+ = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
+   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenBIEnv w env) (weakenArrayInstr w exp1) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))) $
+   mkMapF (lhsToEnv (weakenBIEnv w env) elhs (k weakenId)) (weakenArrayInstr w exp2) (weaken w aOut)
 
 mkMapF _ _ _ = undefined
 
-lhsToEnv :: forall a env env' benv sh.
-  Env (BufferIdx benv) env
-  -> ELeftHandSide a env env'
-  -> TupR (Var GroundR benv) (Buffers a) 
-  -> Env (BufferIdx benv) env'
+lhsToEnv :: forall a env env' env'' sh.
+  BIEnv env env'
+  -> ELeftHandSide a env' env''
+  -> TupR (Var GroundR env) (Buffers a) 
+  -> BIEnv env env''
 lhsToEnv env (LeftHandSideSingle s) (TupRsingle (Var _ idx))
   | Refl <- reprIsSingle @ScalarType @a @Buffer s
-  = Push env (BufferIdx idx)
+  = Push env (BIdx idx)
 lhsToEnv env (LeftHandSidePair l1 l2) (TupRpair t1 t2) = lhsToEnv (lhsToEnv env l1 t1) l2 t2
 lhsToEnv env (LeftHandSideWildcard _) _ = env
 lhsToEnv _ _ _ = error "impossible"
