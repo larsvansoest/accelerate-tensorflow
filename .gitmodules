@@ -1,0 +1,4 @@
+[submodule "extra-deps/accelerate"]
+	path = extra-deps/accelerate
+	url = git@github.com:ivogabe/accelerate.git
+	branch = new-pipeline

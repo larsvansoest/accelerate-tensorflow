@@ -30,7 +30,7 @@ data TensorOp op where
   TVar :: ScalarType s -> Idx env (Buffer s) -> TensorOp (Out sh s -> ())
 
 instance PrettyOp TensorOp where
-  prettyOp (TConst _ _) = "TTensor"
+  prettyOp (TConst s _) = "TTensor"
   prettyOp (TPrimFun _) = "TBinOp"
   prettyOp (TVar _ _)   = "TVar"
 
@@ -88,5 +88,5 @@ mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
    Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenBIEnv w env) (weakenArrayInstr w exp1) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))) $
    mkMapF (addLHSToBIEnv (weakenBIEnv w env) elhs (k weakenId)) (weakenArrayInstr w exp2) (weaken w aOut)
 
-mkMapF env (Evar (Var s idx)) aOut@(ArgArray _ _ gv gvb) = Exec (TVar s (lookupBIEnv idx env)) $ aOut :>: ArgsNil
+mkMapF env (Evar (Var s idx)) aOut = Exec (TVar s (lookupBIEnv idx env)) $ aOut :>: ArgsNil
 mkMapF _ _ _ = undefined

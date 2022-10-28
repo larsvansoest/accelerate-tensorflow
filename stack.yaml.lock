@@ -5,17 +5,6 @@
 
 packages:
 - completed:
-    name: accelerate
-    pantry-tree:
-      sha256: d020cb22686368cfda73a5830f415e529013af8d48f907506216fcc0696b875d
-      size: 24680
-    sha256: 23772e4cc2760de77f194325dff69c34161be1ae51aa6a594c8f1a6ef03b0e4f
-    size: 4733530
-    url: https://github.com/ivogabe/accelerate/archive/e8beabc99a5d6d62c0e23dadbc354defcff7f1cd.tar.gz
-    version: 1.3.0.0
-  original:
-    url: https://github.com/ivogabe/accelerate/archive/e8beabc99a5d6d62c0e23dadbc354defcff7f1cd.tar.gz
-- completed:
     name: accelerate-llvm
     pantry-tree:
       sha256: d64f1b15afc16fecc530f87da2deeaccbe78ef74b3ee90fb5a163aa37b04adaf
