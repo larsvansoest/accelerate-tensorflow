@@ -30,6 +30,12 @@ import Data.Type.Equality
 import Data.Array.Accelerate.Lifetime
 import Foreign
 import Data.Array.Accelerate.AST.Kernel (NoKernelMetadata)
+import Data.Text.Prettyprint.Doc
+import Data.Array.Accelerate.Pretty.Exp
+    ( prettyConst, primOperator )
+import Data.Array.Accelerate.Pretty.Print (Operator(..))
+import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
+import Data.Array.Accelerate.Representation.Shape
 
 data TensorOp op where
   TNil :: TensorOp ()
@@ -39,19 +45,31 @@ data TensorOp op where
 
 instance PrettyOp TensorOp where
   prettyOp TNil = "TNil"
-  prettyOp (TConst s _) = "TTensor"
-  prettyOp (TPrimFun _) = "TBinOp"
-  prettyOp (TVar _ _)   = "TVar"
+  prettyOp (TConst s e) = vsep ["TConst", prettyConst (TupRsingle s) e]
+  prettyOp (TPrimFun f) = vsep ["TBinOp", opName (primOperator f) ]
+  prettyOp (TVar s idx) = vsep ["TVar buffer", pretty (idxToInt idx)]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
 
 instance DesugarAcc TensorOp where
-  mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ _ _ gvb) aOut = mkMapF (addLHSToBIEnv Empty lhs gvb) body aOut 
+  mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ _ _ gvb) aOut = mkMapF (addLHSToBIEnv Empty lhs gvb) body aOut
   mkMap _ _ _ = error "impossible"
 
-  mkGenerate = undefined
-  mkPermute = undefined
+  mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv _)
+    | sh' <- shapeType sh
+    , DeclareVars lhs w k <- declareVars $ buffersR sh'
+    = aletUnique lhs (desugarAlloc (ArrayR sh sh') (fromGrounds gv)) $ 
+      mkMap (weaken w f) (ArgArray In (ArrayR sh sh') (weakenVars w gv) (k weakenId)) (weaken w aOut)
+
+  -- The result array is initialised with the given defaults and 
+  -- any further values that are permuted into the result array 
+  -- are added to the current value using the given combination function.
+
+  -- The combination function is given the new value being permuted as its first argument, 
+  -- and the current value of the array as its second.
+  mkPermute comb defaults perm source
+    = undefined
 
 data BIdx env a where
   BIdx  :: Idx env (Buffer a) -> BIdx env a
@@ -71,7 +89,7 @@ lookupBIEnv (SuccIdx idx) (Push bidxs _) = lookupBIEnv idx bidxs
 addLHSToBIEnv :: forall a env env' env'' sh.
   BIEnv env env'
   -> ELeftHandSide a env' env''
-  -> TupR (Var GroundR env) (Buffers a) 
+  -> TupR (Var GroundR env) (Buffers a)
   -> BIEnv env env''
 addLHSToBIEnv env (LeftHandSideSingle s) (TupRsingle (Var _ idx))
   | Refl <- reprIsSingle @ScalarType @a @Buffer s
@@ -99,8 +117,9 @@ mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
 
 mkMapF env (Evar (Var s idx)) aOut = Exec (TVar s (lookupBIEnv idx env)) $ aOut :>: ArgsNil
 
-mkMapF env (Pair exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv gvb)
- = undefined -- TODO implement
+mkMapF env (Pair exp1 exp2) (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2))
+ = Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF env exp1 (ArgArray Out (ArrayR sh t1) gv gvb1)) $
+   mkMapF env exp2 (ArgArray Out (ArrayR sh t2) gv gvb2)
 
 -- TODO
 
@@ -120,6 +139,7 @@ mkMapF _ (ArrayInstr _ _) _ = undefined
 mkMapF _ (ShapeSize _ _) _ = undefined
 mkMapF _ (Undef _) _ = undefined
 mkMapF _ (Coerce _ _ _) _ = undefined
+mkMapF _ _ _ = error "impossible"
 
 -- temp kernel for testing purposes
 
