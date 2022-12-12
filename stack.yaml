@@ -28,7 +28,6 @@ extra-deps:
 - MIP-0.1.1.0
 - OptDir-0.0.4
 - bytestring-encoding-0.1.0.0
-
 - extra-deps/accelerate
 
 # Override default flag values for local packages and extra-deps

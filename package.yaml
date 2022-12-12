@@ -32,6 +32,7 @@ flags:
 dependencies:
 - base >= 4.7 && < 5
 - accelerate
+- prettyprinter >= 1.7.1
 # - accelerate-llvm-native
 # - accelerate-llvm-ptx
 

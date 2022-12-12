@@ -1,0 +1,4 @@
+# Make sure extra-deps/accelerate has a stack.yaml.
+# Then open an accelerate file, and wait for everything to load.
+cradle:
+  stack:
