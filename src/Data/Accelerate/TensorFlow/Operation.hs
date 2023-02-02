@@ -53,7 +53,8 @@ instance NFData' TensorOp where
   rnf' !_ = ()
 
 instance DesugarAcc TensorOp where
-  mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ _ _ gvb) aOut = mkMapF (addLHSToBIEnv Empty lhs gvb) body aOut
+  mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ _ _ gvb) aOut = 
+    mkMapF (addLHSToBIEnv Empty lhs gvb) body aOut
   mkMap _ _ _ = error "impossible"
 
   mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv _)
@@ -98,27 +99,50 @@ addLHSToBIEnv env (LeftHandSidePair l1 l2) (TupRpair t1 t2) = addLHSToBIEnv (add
 addLHSToBIEnv env (LeftHandSideWildcard _) _ = env
 addLHSToBIEnv _ _ _ = error "impossible"
 
-mkMapF :: forall env env' sh t. BIEnv env env' -> PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+mkMapF :: forall env env' sh t. BIEnv env env' -> PreOpenExp (ArrayInstr env) env' t 
+  -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
 mkMapF _ (Const s e) aOut = Exec (TConst s e) $ aOut :>: ArgsNil
 
 mkMapF env (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp
  , DeclareVars lhs w k <- declareVars $ buffersR a
  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
-   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenBIEnv w env) (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))) $
-   Exec (TPrimFun f) (ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>: weaken w aOut :>: ArgsNil)
+   Alet (LeftHandSideWildcard TupRunit) TupRunit 
+   (mkMapF 
+     (weakenBIEnv w env) 
+     (weakenArrayInstr w exp) 
+     (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
+   ) $
+   Exec 
+    (TPrimFun f) 
+    (ArgArray In 
+      (ArrayR sh a) 
+      (weakenVars w gv) 
+      (k weakenId) :>: weaken w aOut :>: ArgsNil
+    )
 
 mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp1
  , DeclareVars lhs w k <- declareVars $ buffersR a
  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
-   Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF (weakenBIEnv w env) (weakenArrayInstr w exp1) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))) $
-   mkMapF (addLHSToBIEnv (weakenBIEnv w env) elhs (k weakenId)) (weakenArrayInstr w exp2) (weaken w aOut)
+   Alet (LeftHandSideWildcard TupRunit) TupRunit 
+   (mkMapF 
+     (weakenBIEnv w env) 
+     (weakenArrayInstr w exp1) 
+     (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
+   ) $
+   mkMapF 
+     (addLHSToBIEnv (weakenBIEnv w env) elhs (k weakenId)) 
+     (weakenArrayInstr w exp2) 
+     (weaken w aOut)
 
-mkMapF env (Evar (Var s idx)) aOut = Exec (TVar s (lookupBIEnv idx env)) $ aOut :>: ArgsNil
+mkMapF env (Evar (Var s idx)) aOut = 
+  Exec (TVar s (lookupBIEnv idx env)) $ aOut :>: ArgsNil
 
-mkMapF env (Pair exp1 exp2) (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2))
- = Alet (LeftHandSideWildcard TupRunit) TupRunit (mkMapF env exp1 (ArgArray Out (ArrayR sh t1) gv gvb1)) $
+mkMapF env (Pair exp1 exp2) 
+  (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2))
+ = Alet (LeftHandSideWildcard TupRunit) TupRunit (
+    mkMapF env exp1 (ArgArray Out (ArrayR sh t1) gv gvb1)) $
    mkMapF env exp2 (ArgArray Out (ArrayR sh t2) gv gvb2)
 
 -- TODO

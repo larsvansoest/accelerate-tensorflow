@@ -21,28 +21,62 @@ import Data.Array.Accelerate.Trafo.Desugar
 import Data.Array.Accelerate.Trafo.Exp.Substitution
 import Data.Accelerate.TensorFlow.Operation
 
-mapXTimesTwoPlusOne' :: forall env sh s t. Arg env (In sh Int64) -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
-mapXTimesTwoPlusOne' (ArgArray _ arrayR@(ArrayR sh ty) gvIn gvbIn) argOut
-  | DeclareVars lhs  w  k  <- declareVars $ buffersR ty
-  , DeclareVars lhs' w' k' <- declareVars $ buffersR ty
+mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) 
+  -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
+mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh ty) gvIn gvbIn) argOut
+  | DeclareVars lhs  w  k  <- declareVars $ buffersR ty -- variable to new array
+  , DeclareVars lhs' w' k' <- declareVars $ buffersR ty -- variable to new array
   = let
     nInt64 :: NumType Int64
     nInt64 = IntegralNumType TypeInt64
     sInt64 :: ScalarType Int64
     sInt64 = SingleScalarType (NumSingleType nInt64)
-    bInt64 :: GroundR (Buffer Int64)
-    bInt64 = GroundRbuffer sInt64
     arrayR' :: ArrayR (Array sh (Int64, Int64))
     arrayR' = ArrayR sh $ TupRpair (TupRsingle sInt64) (TupRsingle sInt64)
-  in aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
+  in 
+     -- Allocate new array
+     aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
      Alet (LeftHandSideWildcard TupRunit) TupRunit
-       (Exec (TConst sInt64 2) (ArgArray Out (ArrayR sh (TupRsingle sInt64)) (weakenVars w gvIn) (weakenVars w gvbIn) :>: ArgsNil)) $
-         Alet (LeftHandSideWildcard TupRunit) TupRunit
-           (Exec (TPrimFun (PrimMul nInt64)) (ArgArray In arrayR' (weakenVars w gvIn) (TupRpair (weakenVars w gvbIn) (k weakenId)) :>: weaken w argOut :>: ArgsNil)) $
-             aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $
-               Alet (LeftHandSideWildcard TupRunit) TupRunit
-                 (Exec (TConst sInt64 1) (ArgArray Out (ArrayR sh (TupRsingle sInt64)) (weakenVars (w' .> w) gvIn) (weakenVars (w' .> w) gvbIn) :>: ArgsNil)) $
-                   Exec (TPrimFun (PrimAdd nInt64)) (ArgArray In arrayR' (weakenVars (w' .> w) gvIn) (TupRpair (weakenVars (w' .> w) gvbIn) (k' weakenId)) :>: weaken (w' .> w) argOut :>: ArgsNil)
+       (Exec -- Fill new new array with the number 2
+         (TConst sInt64 2) 
+         (ArgArray 
+           Out 
+           (ArrayR sh (TupRsingle sInt64)) 
+           (weakenVars w gvIn) -- Weaken variables with the new array
+           (weakenVars w gvbIn) :>: ArgsNil
+         )
+       ) $
+       Alet (LeftHandSideWildcard TupRunit) TupRunit
+         (Exec -- (*2) Multiply input array with new array
+           (TPrimFun (PrimMul nInt64))
+           (ArgArray 
+             In 
+             arrayR' 
+             (weakenVars w gvIn)
+             (TupRpair (weakenVars w gvbIn) (k weakenId)) :>: weaken w argOut :>: ArgsNil
+           )
+         ) $
+         -- Allocate new array
+         aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $
+           Alet (LeftHandSideWildcard TupRunit) TupRunit
+             (Exec -- Fill new array with the number 1
+               (TConst sInt64 1) 
+               (ArgArray 
+                 Out 
+                 (ArrayR sh (TupRsingle sInt64)) 
+                 (weakenVars (w' .> w) gvIn) -- Weaken variables with both new arrays
+                 (weakenVars (w' .> w) gvbIn) :>: ArgsNil
+               )
+             ) $
+            Exec -- (+1) Add new array to the result array of (*2)
+              (TPrimFun (PrimAdd nInt64)) 
+              (ArgArray 
+                In 
+                arrayR' 
+                (weakenVars (w' .> w) gvIn) 
+                (TupRpair (weakenVars (w' .> w) gvbIn) (k' weakenId)) 
+                  :>: weaken (w' .> w) argOut :>: ArgsNil
+              )
 
 mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
 mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh _) gvIn gvbIn) argOut = let
