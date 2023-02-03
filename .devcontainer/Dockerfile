@@ -69,7 +69,7 @@ RUN export BOOTSTRAP_HASKELL_INSTALL_STACK=True \
 ENV PATH="/home/${USERNAME}/.ghcup/bin:${PATH}"
 
 # install Haskell Language Server with ghcup
-RUN ghcup compile hls -v ${HLS_VERSION} --ghc ${GHC_VERSION}
+# RUN ghcup compile hls -v ${HLS_VERSION} --ghc ${GHC_VERSION}
 
 # set c enconding to utf-8
 ENV LC_ALL="C.UTF-8"
