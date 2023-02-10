@@ -36,43 +36,51 @@ import Data.Array.Accelerate.Pretty.Exp
 import Data.Array.Accelerate.Pretty.Print (Operator(..))
 import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
 import Data.Array.Accelerate.Representation.Shape
+import Data.Array.Accelerate.Smart (typeR, undef)
+import GHC.Conc (TVar(TVar))
 
-newtype BufferIdx benv a = BIdx (Idx benv (Buffer a)) -- a is enkele binding uit env
+newtype BufferIdx benv a = BIdx (Idx benv (Buffer a)) -- a is enkele binding uit benv
 -- | Environment with indexes pointing to buffers
+
+instance Sink BufferIdx where
+  weaken w (BIdx idx) = BIdx (weaken w idx)
 
 -- benv is buffer env
 -- env is scalar env
 -- in env staat een int, en en benv kan ik op zoek naar een buffer van ints
 type BufferEnv benv env = Env (BufferIdx benv) env
 
+weakenEnv :: Sink f => (env1 :> env') -> Env (f env1) env2 -> Env (f env') env2
+weakenEnv w = mapEnv (weaken w)
+
+-- forall is alleen nodig als je @s wilt gebruiken in de method definition
+distributeBIdx :: forall env s. TypeR s -> GroundVars env (Buffers s) -> Distribute (BufferIdx env) s
+distributeBIdx TupRunit _ = ()
+distributeBIdx (TupRsingle s) (TupRsingle (Var _ idx))
+  | Refl <- reprIsSingle @ScalarType @s @(BufferIdx env) s
+  , Refl <- reprIsSingle @ScalarType @s @Buffer s
+  = BIdx idx
+distributeBIdx (TupRpair l1 l2) (TupRpair r1 r2) = (distributeBIdx l1 r1, distributeBIdx l2 r2)
+distributeBIdx _ _ = error "impossible"
+
 data TensorOp op where
   TNil :: TensorOp ()
   TConst :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
-  TVar :: ScalarType s -> Idx env (Buffer s) -> TensorOp (Out sh s -> ())
+  TId :: ScalarType s -> TensorOp (In sh s -> Out sh s -> ())
 
 instance PrettyOp TensorOp where
   prettyOp TNil         = "TNil"
   prettyOp (TConst s e) = vsep ["TConst", prettyConst (TupRsingle s) e]
   prettyOp (TPrimFun f) = vsep ["TBinOp", opName (primOperator f) ]
-  prettyOp (TVar _ _)   = "TVar"
+  prettyOp (TId s)   = vsep ["TId", prettyScalarType s]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
 
--- forall is alleen nodig als je @s wilt gebruiken in de method definition
-f :: forall env s. TypeR s -> TupR (Var GroundR env) (Distribute Buffer s) -> Distribute (BufferIdx env) s
-f TupRunit _ = ()
-f (TupRsingle s) (TupRsingle (Var _ idx)) 
-  | Refl <- reprIsSingle @ScalarType @s @(BufferIdx env) s
-  , Refl <- reprIsSingle @ScalarType @s @Buffer s
-  = BIdx idx
-f (TupRpair l1 l2) (TupRpair r1 r2) = (f l1 r1, f l2 r2)
-f _ _ = error "impossible"
-
 instance DesugarAcc TensorOp where
   mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ (ArrayR _ t) _ gvb) aOut =
-    mkMapF (push' Empty (lhs, f t gvb)) body aOut
+    mkMapF (push' Empty (lhs, distributeBIdx t gvb)) body aOut
   mkMap _ _ _ = error "impossible"
 
   mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv _)
@@ -90,14 +98,10 @@ instance DesugarAcc TensorOp where
   mkPermute comb defaults perm source
     = undefined
 
-
-
-
-
-
 -- lookupBIEnv :: Idx env' t -> BIEnv env env' -> Idx env (Buffer t)
 -- lookupBIEnv ZeroIdx (Push _ (BIdx bidx)) = bidx
 -- lookupBIEnv (SuccIdx idx) (Push bidxs _) = lookupBIEnv idx bidxs
+
 
 mkMapF :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' t
   -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
@@ -108,17 +112,17 @@ mkMapF env (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
  , DeclareVars lhs w k <- declareVars $ buffersR a
  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
    Alet (LeftHandSideWildcard TupRunit) TupRunit
-   (mkMapF
-     (weakenBufferEnv w env)
+   (mkMapF -- flatten higher-order expression
+     (weakenEnv w env)
      (weakenArrayInstr w exp)
      (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
    ) $
-   Exec
+   Exec -- apply method to the result
     (TPrimFun f)
-    (ArgArray In
-      (ArrayR sh a)
-      (weakenVars w gv)
-      (k weakenId) :>: weaken w aOut :>: ArgsNil
+    (
+      ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>:
+      weaken w aOut :>:
+      ArgsNil
     )
 
 mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
@@ -127,18 +131,26 @@ mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
    Alet (LeftHandSideWildcard TupRunit) TupRunit
    (mkMapF
-     (weakenBufferEnv w env)
+     (weakenEnv w env)
      (weakenArrayInstr w exp1)
      (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
    ) $
    mkMapF
-     (pushBufferEnv elhs (k weakenId) (weakenBufferEnv w env))
+     (push' (weakenEnv w env) (elhs, distributeBIdx a (k weakenId)))
      (weakenArrayInstr w exp2)
      (weaken w aOut)
 
-mkMapF env (Evar (Var s idx)) aOut = let
-  x = prj idx env in
-  Exec (TVar s) $ _
+mkMapF env (Evar (Var s idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR _)))
+  | Refl <- reprIsSingle @ScalarType @t @Buffer s
+  = let (BIdx idx') = prj' idx env
+        gvb'         = TupRsingle (Var groundR idx')
+    in  Exec 
+          (TId s) 
+          (
+            ArgArray In arrayR gv gvb' :>: 
+            ArgArray Out arrayR gv gvb :>: 
+            ArgsNil
+          )
 
 mkMapF env (Pair exp1 exp2)
   (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2))
@@ -165,6 +177,7 @@ mkMapF _ (ShapeSize _ _) _ = undefined
 mkMapF _ (Undef _) _ = undefined
 mkMapF _ (Coerce _ _ _) _ = undefined
 mkMapF _ _ _ = error "impossible"
+
 
 -- temp kernel for testing purposes
 
