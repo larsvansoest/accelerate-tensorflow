@@ -63,17 +63,23 @@ distributeBIdx (TupRsingle s) (TupRsingle (Var _ idx))
 distributeBIdx (TupRpair l1 l2) (TupRpair r1 r2) = (distributeBIdx l1 r1, distributeBIdx l2 r2)
 distributeBIdx _ _ = error "impossible"
 
+data ScatterFun where
+  ScatterFunAdd :: ScatterFun
+  ScatterFunMin :: ScatterFun
+
 data TensorOp op where
   TNil :: TensorOp ()
   TConst :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
-  TId :: ScalarType s -> TensorOp (In sh s -> Out sh s -> ())
+  TId :: TensorOp (In sh t -> Out sh t -> ())
+  TTensorScatter :: ScalarType s -> ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
+  TBooleanMask :: TensorOp (In DIM1 a -> In DIM1 PrimBool -> Out DIM1 a -> ())
 
 instance PrettyOp TensorOp where
   prettyOp TNil         = "TNil"
   prettyOp (TConst s e) = vsep ["TConst", prettyConst (TupRsingle s) e]
   prettyOp (TPrimFun f) = vsep ["TBinOp", opName (primOperator f) ]
-  prettyOp (TId s)   = vsep ["TId", prettyScalarType s]
+  prettyOp TId          = "TId"
 
 instance NFData' TensorOp where
   rnf' !_ = ()
@@ -95,13 +101,98 @@ instance DesugarAcc TensorOp where
 
   -- The combination function is given the new value being permuted as its first argument, 
   -- and the current value of the array as its second.
-  mkPermute comb defaults perm source
-    = undefined
+  mkPermute
+    comb
+    defaults@(ArgArray _ arrayR@(ArrayR sh' t') gv' gvb')
+    perm
+    source@(ArgArray _ (ArrayR sh t) gv gvb)
+    | maybeSh' <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
+    , DeclareVars lhs w k <- declareVars $ buffersR maybeSh'
+    , DeclareVars lhs' w' k' <- declareVars $ buffersR (TupRsingle scalarTypeWord8)
+    --, DeclareVars lhs' w' k' <- declareVars $ buffersR (TupRpair (shapeType sh) maybeSh')
+    = -- 1) allocate maybe indices array (maybe sh')
+      aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (mkGenerate (weaken w perm) (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))) $
+      -- 3) flatten maybe indices, get boolean mask
+      aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeWord8)) _) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (mkMap 
+        _ 
+        (_ (ArgArray In (ArrayR sh maybeSh') _ (k weakenId)))
+        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (k' weakenId))
+      )
+      (Exec
+        TBooleanMask
+        (_ :>: 
+         ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (k' weakenId) :>: 
+         _ :>: 
+         ArgsNil)
+      )
+      -- 4) apply boolean mask source and maybe indices
+      -- 5) scatter 
 
--- lookupBIEnv :: Idx env' t -> BIEnv env env' -> Idx env (Buffer t)
--- lookupBIEnv ZeroIdx (Push _ (BIdx bidx)) = bidx
--- lookupBIEnv (SuccIdx idx) (Push bidxs _) = lookupBIEnv idx bidxs
+      -- 2) zip with original values (src, maybe sh')
+      -- aletUnique lhs' (desugarAlloc (ArrayR sh (TupRpair sht primMaybeSh')) (fromGrounds (weakenVars w gv))) $
+      -- Alet (LeftHandSideWildcard TupRunit) TupRunit
+      -- (mkZip 
+      --   (weaken (w' .> w) source)
+      --   (ArgArray In (ArrayR sh primMaybeSh') (weakenVars (w' .> w) gv) (k' weakenId)) 
+      --   (ArgArray Out (ArrayR sh (TupRpair _ primMaybeSh')) (weakenVars (w' .> w) gv) (k' weakenId))
+      -- )
+      -- 3) map (src, nothing) -> (default, ?), 
+          --    (src, just j) -> (comb(src, defaults[j]), j)
+      -- (mkZip 
+      --   (weaken w source) 
+      --   (ArgArray In (ArrayR sh primMaybeSh') (weakenVars w gv) (k weakenId)) 
+      --   _
+      -- ) 
+      -- (mkMap 
+      --   _ 
+      --   (ArgArray In (ArrayR sh primMaybeSh') (weakenVars w gv) (k weakenId)) 
+      --   (ArgArray Out (ArrayR sh t) (weakenVars w gv) (k weakenId))
+      -- )
+      --Alet (LeftHandSideWildcard TupRunit) TupRunit
+      --2) fill indices array
+      -- (mkGenerate 
+      --  (weaken w (ArgFun (Lam lhs' $ Body $ (case apply1 primMaybeSh' perm vars of
+      --     Let lhs2 poe poe' -> error "1"
+      --     _ -> error "2"
+      --  )))) --(Alam lhs' $ Abody $ apply1 perm lhs')
+      --  (ArgArray Out (ArrayR sh sh't) (weakenVars w gv) (k weakenId)))
+      --_ 
+      
+      --_ --(mkBackpermute (Arg env (Fun' (sh' -> sh))) (Arg env (In sh t)) (Arg env (Out sh' t)) _ _ _ _)
+      --_
 
+
+  --   , sh't <- shapeType sh'
+  --   , sh'mt < (Word8, ((), shapeType sh'))
+  --   , DeclareVars lhs w k <- declareVars primConstType (PrimConst a) sh't
+  --   , LHS shi _ <- mkLHS sh't
+  --   = -- 1) allocate scatter indices array
+  --     aletUnique lhs (desugarAlloc (ArrayR sh (primMaybify sh't)) (fromGrounds gv)) $
+  --     Alet (LeftHandSideWildcard TupRunit) TupRunit
+  --     (mkGenerate (weaken w perm) (ArgArray Out (ArrayR sh sh't) (weakenVars w gv) _))
+  -- --       _
+  --       -- 2) fill 
+          -- mkGenerate (ArgFun $
+          --   Lam lhs $ _
+          -- ) (ArgArray Out arrayR gv' gvb')
+
+        -- 1) allocate array with scatter indices
+        --aletUnique lhs (desugarAlloc (ArrayR sh sh't) (fromGrounds gv)) $
+        -- 2) fill output array with defaults
+        --Alet (LeftHandSideWildcard TupRunit) TupRunit
+        --  (mkGenerate (weaken w perm) (ArgArray Out (ArrayR sh sh't) _ _))
+        --  _
+        -- 3) allocate alternative source array
+        -- 4) fill source array according to perm indices
+        -- 5) 
+
+          --     Alet (LeftHandSideWildcard TupRunit) TupRunit
+          -- (mkGenerate (ArgFun f) (ArgArray Out arrayR gv gvb)) -- \sh -> case perm sh of
+          -- _
 
 mkMapF :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' t
   -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
@@ -144,11 +235,11 @@ mkMapF env (Evar (Var s idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR
   | Refl <- reprIsSingle @ScalarType @t @Buffer s
   = let (BIdx idx') = prj' idx env
         gvb'         = TupRsingle (Var groundR idx')
-    in  Exec 
-          (TId s) 
+    in  Exec
+          TId
           (
-            ArgArray In arrayR gv gvb' :>: 
-            ArgArray Out arrayR gv gvb :>: 
+            ArgArray In arrayR gv gvb' :>:
+            ArgArray Out arrayR gv gvb :>:
             ArgsNil
           )
 
@@ -166,7 +257,7 @@ mkMapF _ (VecPack _ _) _ = undefined
 mkMapF _ (VecUnpack _ _) _ = undefined
 mkMapF _ (IndexSlice _ _ _) _ = undefined
 mkMapF _ (IndexFull _ _ _) _ = undefined
-mkMapF _ (ToIndex _ _ _) _ = undefined
+mkMapF _ (ToIndex _ _ _) _ = undefined -- hoe bewijs ik dat sh = sh?
 mkMapF _ (FromIndex _ _ _) _ = undefined
 mkMapF _ (Case _ _ _) _ = undefined
 mkMapF _ (Cond _ _ _) _ = undefined
