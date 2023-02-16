@@ -10,6 +10,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use record patterns" #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -107,28 +108,43 @@ instance DesugarAcc TensorOp where
     perm
     source@(ArgArray _ (ArrayR sh t) gv gvb)
     | maybeSh' <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
-    , DeclareVars lhs w k <- declareVars $ buffersR maybeSh'
+    , DeclareVars lhs w k  <- declareVars $ buffersR maybeSh'
     , DeclareVars lhs' w' k' <- declareVars $ buffersR (TupRsingle scalarTypeWord8)
-    --, DeclareVars lhs' w' k' <- declareVars $ buffersR (TupRpair (shapeType sh) maybeSh')
-    = -- 1) allocate maybe indices array (maybe sh')
+    = -- 1) allocate unflattened perm indices array (maybe sh')
       aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (mkGenerate (weaken w perm) (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))) $
-      -- 3) flatten maybe indices, get boolean mask
-      aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeWord8)) _) $
+      (mkGenerate 
+        (weaken w perm)
+        (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))
+      ) $
+      aletUnique lhs' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeWord8)) (fromGrounds (weakenVars w gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (mkMap 
-        _ 
-        (_ (ArgArray In (ArrayR sh maybeSh') _ (k weakenId)))
-        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (k' weakenId))
-      )
-      (Exec
-        TBooleanMask
-        (_ :>: 
-         ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (k' weakenId) :>: 
-         _ :>: 
-         ArgsNil)
-      )
+      (Acond _ _ _)
+      _
+      -- (Exec
+      --   TBooleanMask
+      --   (_ :>: 
+      --    ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (_ (weakenVars w gv)) ((\case
+      --     TupRsingle (Var _ _) -> undefined
+      --     TupRpair _ _ -> error "impossible" ) (k weakenId)) :>: 
+      --    _ :>: 
+      --    ArgsNil)
+      -- )
+      -- 3) flatten maybe indices, get boolean mask
+      -- aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeWord8)) _) $
+      -- Alet (LeftHandSideWildcard TupRunit) TupRunit
+      -- (mkMap 
+      --   _ 
+      --   (_ (ArgArray In (ArrayR sh maybeSh') _ (k weakenId)))
+      --   (ArgArray Out (ArrayR sh (TupRsingle scalarTypeWord8)) _ (k' weakenId))
+      -- )
+      -- (Exec
+      --   TBooleanMask
+      --   (_ :>: 
+      --    ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (k' weakenId) :>: 
+      --    _ :>: 
+      --    ArgsNil)
+      -- )
       -- 4) apply boolean mask source and maybe indices
       -- 5) scatter 
 
