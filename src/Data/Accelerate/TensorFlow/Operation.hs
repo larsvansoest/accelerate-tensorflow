@@ -124,9 +124,9 @@ instance DesugarAcc TensorOp where
       aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (fromGrounds (weakenVars w gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (booleanMask maybeSh 
-       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w' .> w) gv) (weakenVars w' $ extract1 (TupRpair TupRunit (shapeType sh)) (k weakenId)))
-       (extract2 (shapeType sh) (k weakenId)) 
-       (k' weakenId)
+       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w' .> w) gv) (weakenVars w' $ primMaybe1 (TupRpair TupRunit (shapeType sh)) (k weakenId)))
+       _
+       _
       ) $
       _
       -- aletUnique lhs'' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w' .> w) gv))) $
@@ -174,13 +174,13 @@ booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvb
  (booleanMask t2 aOut gvbIn2 gvbOut2)
 booleanMask _ _ _ _ = error "impossible"
 
-extract1 :: TypeR a -> GroundVars env (Buffers (Word8, a)) -> GroundVars env (Buffers Word8)
-extract1 _ (TupRpair word8 _) = word8
-extract1 _ _ = error "impossible"
+primMaybe1 :: TypeR a -> GroundVars env (Buffers (Word8, a)) -> GroundVars env (Buffers Word8)
+primMaybe1 _ (TupRpair word8 _) = word8
+primMaybe1 _ _ = error "impossible"
 
-extract2 :: TypeR a -> GroundVars env (Buffers (Word8, ((), a))) -> GroundVars env (Buffers a)
-extract2 _ (TupRpair _ (TupRpair _ a)) = a
-extract2 _ _ = error "impossible"
+primMaybe2 :: TypeR a -> GroundVars env (Buffers (Word8, ((), a))) -> GroundVars env (Buffers a)
+primMaybe2 _ (TupRpair _ (TupRpair _ a)) = a
+primMaybe2 _ _ = error "impossible"
 
 
       -- 3) flatten maybe indices, get boolean mask
