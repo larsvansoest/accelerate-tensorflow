@@ -73,14 +73,16 @@ data TensorOp op where
   TConst :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
   TId :: TensorOp (In sh t -> Out sh t -> ())
-  TTensorScatter :: ScalarType s -> ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
-  TBooleanMask :: TensorOp (In DIM1 a -> In DIM1 PrimBool -> Out DIM1 a -> ())
+  TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
+  TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
 
 instance PrettyOp TensorOp where
   prettyOp TNil         = "TNil"
   prettyOp (TConst s e) = vsep ["TConst", prettyConst (TupRsingle s) e]
   prettyOp (TPrimFun f) = vsep ["TBinOp", opName (primOperator f) ]
   prettyOp TId          = "TId"
+  prettyOp (TTensorScatter f) = vsep ["TTensorScatter"]
+  prettyOp (TBooleanMask t) = vsep ["TBooleanMask"]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
@@ -93,7 +95,7 @@ instance DesugarAcc TensorOp where
   mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv _)
     | sh' <- shapeType sh
     , DeclareVars lhs w k <- declareVars $ buffersR sh'
-    = aletUnique lhs (desugarAlloc (ArrayR sh sh') (fromGrounds gv)) $
+    = aletUnique lhs (desugarAlloc (ArrayR sh sh') (fromGrounds gv)) $ -- missing: filling with indices
       mkMap (weaken w f) (ArgArray In (ArrayR sh sh') (weakenVars w gv) (k weakenId)) (weaken w aOut)
 
   -- The result array is initialised with the given defaults and 
@@ -104,32 +106,83 @@ instance DesugarAcc TensorOp where
   -- and the current value of the array as its second.
   mkPermute
     comb
-    defaults@(ArgArray _ arrayR@(ArrayR sh' t') gv' gvb')
+    defaults@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) _) gv' gvb')
     perm
-    source@(ArgArray _ (ArrayR sh t) gv gvb)
-    | maybeSh' <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
-    , DeclareVars lhs w k  <- declareVars $ buffersR maybeSh'
-    , DeclareVars lhs' w' k' <- declareVars $ buffersR (TupRsingle scalarTypeWord8)
-    = -- 1) allocate unflattened perm indices array (maybe sh')
-      aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
+    source@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) t) gv gvb)
+    | sh <- ShapeRsnoc ShapeRz
+    , maybeSh <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh))
+    , DeclareVars lhs w k  <- declareVars $ buffersR maybeSh
+    , DeclareVars lhs' w' k' <- declareVars $ buffersR (shapeType sh)
+    , DeclareVars lhs'' w'' k'' <- declareVars $ buffersR t
+    = -- 1) allocate permute indices array n
+      aletUnique lhs (desugarAlloc (ArrayR sh maybeSh) (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (mkGenerate 
+      (mkGenerate
         (weaken w perm)
-        (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))
+        (ArgArray Out (ArrayR sh maybeSh) (weakenVars w gv) (k weakenId))
       ) $
-      aletUnique lhs' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeWord8)) (fromGrounds (weakenVars w gv))) $
+      aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (fromGrounds (weakenVars w gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (Acond _ _ _)
+      (booleanMask maybeSh 
+       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w' .> w) gv) (weakenVars w' $ extract1 (TupRpair TupRunit (shapeType sh)) (k weakenId)))
+       (extract2 (shapeType sh) (k weakenId)) 
+       (k' weakenId)
+      ) $
       _
+      -- aletUnique lhs'' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w' .> w) gv))) $
+      -- Alet (LeftHandSideWildcard TupRunit) TupRunit
       -- (Exec
-      --   TBooleanMask
-      --   (_ :>: 
-      --    ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (_ (weakenVars w gv)) ((\case
-      --     TupRsingle (Var _ _) -> undefined
-      --     TupRpair _ _ -> error "impossible" ) (k weakenId)) :>: 
-      --    _ :>: 
-      --    ArgsNil)
+      --   (TBooleanMask t)
+      --   (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb) :>:
+      --     ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w') $ extract1 (TupRpair TupRunit (shapeType sh)) (k weakenId)) :>:
+      --     ArgArray Out (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId) :>:
+      --     ArgsNil))
+      -- (Exec
+      --   (TTensorScatter ScatterFunAdd)
+      --   (ArgArray Mut (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb) :>: 
+      --    ArgArray In (ArrayR sh (shapeType sh)) (weakenVars (w'' .> w' .> w) gv) (weakenVars w'' $ k' weakenId) :>: 
+      --    ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId) :>: ArgsNil)
       -- )
+
+  mkPermute _ _ _ _ = undefined
+    -- = -- 1) allocate perm indices array (maybe sh')
+    --   aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
+    --   Alet (LeftHandSideWildcard TupRunit) TupRunit
+    --   (mkGenerate
+    --     (weaken w perm)
+    --     (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))
+    --   ) $
+    --   aletUnique lhs' (desugarAlloc (ArrayR dim1 (shapeType sh')) (shapeExpVars dim1 (weakenVars w gv))) $
+    --   Alet (LeftHandSideWildcard TupRunit) TupRunit
+    --   (Exec
+    --     TBooleanMask
+    --     (ArgArray In (ArrayR dim1 (shapeType sh')) _ ((\case
+    --       TupRsingle _ -> error "impossible"
+    --       TupRpair _ (TupRpair _ x) -> x
+    --       _ -> error "impossible") (k weakenId)) :>: 
+    --      ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (f (k weakenId)) :>: 
+    --      ArgArray Out (ArrayR dim1 (shapeType sh')) _ (k' weakenId) :>: 
+    --      ArgsNil)
+    --   )
+    --   _
+
+booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
+booleanMask TupRunit _ _ gvb = Return gvb
+booleanMask (TupRsingle s) aOut@(ArgArray _ _ gv _) gvbIn gvbOut = Exec (TBooleanMask s) (ArgArray In (ArrayR dim1 (typeR s)) gv gvbIn :>: aOut :>: ArgArray Out (ArrayR dim1 (typeR s)) gv gvbOut :>: ArgsNil)
+booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit 
+ (booleanMask t1 aOut gvbIn1 gvbOut1)
+ (booleanMask t2 aOut gvbIn2 gvbOut2)
+booleanMask _ _ _ _ = error "impossible"
+
+extract1 :: TypeR a -> GroundVars env (Buffers (Word8, a)) -> GroundVars env (Buffers Word8)
+extract1 _ (TupRpair word8 _) = word8
+extract1 _ _ = error "impossible"
+
+extract2 :: TypeR a -> GroundVars env (Buffers (Word8, ((), a))) -> GroundVars env (Buffers a)
+extract2 _ (TupRpair _ (TupRpair _ a)) = a
+extract2 _ _ = error "impossible"
+
+
       -- 3) flatten maybe indices, get boolean mask
       -- aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeWord8)) _) $
       -- Alet (LeftHandSideWildcard TupRunit) TupRunit
@@ -177,7 +230,7 @@ instance DesugarAcc TensorOp where
       --  )))) --(Alam lhs' $ Abody $ apply1 perm lhs')
       --  (ArgArray Out (ArrayR sh sh't) (weakenVars w gv) (k weakenId)))
       --_ 
-      
+
       --_ --(mkBackpermute (Arg env (Fun' (sh' -> sh))) (Arg env (In sh t)) (Arg env (Out sh' t)) _ _ _ _)
       --_
 
@@ -209,6 +262,7 @@ instance DesugarAcc TensorOp where
           --     Alet (LeftHandSideWildcard TupRunit) TupRunit
           -- (mkGenerate (ArgFun f) (ArgArray Out arrayR gv gvb)) -- \sh -> case perm sh of
           -- _
+
 
 mkMapF :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' t
   -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
@@ -250,7 +304,7 @@ mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
 mkMapF env (Evar (Var s idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR _)))
   | Refl <- reprIsSingle @ScalarType @t @Buffer s
   = let (BIdx idx') = prj' idx env
-        gvb'         = TupRsingle (Var groundR idx')
+        gvb'        = TupRsingle (Var groundR idx')
     in  Exec
           TId
           (
@@ -259,16 +313,18 @@ mkMapF env (Evar (Var s idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR
             ArgsNil
           )
 
-mkMapF env (Pair exp1 exp2)
-  (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2))
- = Alet (LeftHandSideWildcard TupRunit) TupRunit (
-    mkMapF env exp1 (ArgArray Out (ArrayR sh t1) gv gvb1)) $
-   mkMapF env exp2 (ArgArray Out (ArrayR sh t2) gv gvb2)
+mkMapF env (Pair exp1 exp2) (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2))
+ = Alet (LeftHandSideWildcard TupRunit) TupRunit
+   (mkMapF env exp1 (ArgArray Out (ArrayR sh t1) gv gvb1))
+   (mkMapF env exp2 (ArgArray Out (ArrayR sh t2) gv gvb2))
 
 -- TODO
 
 mkMapF _ (Foreign _ _ _ _) _ = undefined
-mkMapF _ Nil _ = undefined
+mkMapF _ Nil _ = Return TupRunit
+--mkMapF env Nil (ArgArray _ arrayR gv gvb) = Return gvb
+-- TId (ArgArray In arrayR gv gvb :>: ArgArray Out arrayR gv gvb :>: ArgsNil)
+--mkMapF _ Nil (ArgArray _ _ _ gvb) = Return gvb
 mkMapF _ (VecPack _ _) _ = undefined
 mkMapF _ (VecUnpack _ _) _ = undefined
 mkMapF _ (IndexSlice _ _ _) _ = undefined
