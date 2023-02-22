@@ -38,7 +38,7 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh ty) gvIn gvbIn) argOut
      aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
      Alet (LeftHandSideWildcard TupRunit) TupRunit
        (Exec -- Fill new new array with the number 2
-         (TConst sInt64 2) 
+         (TConstant sInt64 2) 
          (ArgArray 
            Out 
            (ArrayR sh (TupRsingle sInt64)) 
@@ -60,7 +60,7 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh ty) gvIn gvbIn) argOut
          aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $
            Alet (LeftHandSideWildcard TupRunit) TupRunit
              (Exec -- Fill new array with the number 1
-               (TConst sInt64 1) 
+               (TConstant sInt64 1) 
                (ArgArray 
                  Out 
                  (ArrayR sh (TupRsingle sInt64)) 

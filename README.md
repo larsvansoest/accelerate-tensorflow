@@ -103,3 +103,44 @@ If a file is highlighted with the error `Please ensure that ghcide is compiled w
 
 #### Git Commit Error: unable to start editor 'editor'
 When merging branches locally, if git throws `unable to start editor 'editor'`, it can not find a suitable editor. To resolve this issue, ensure the git config contains `core.editor = code`. For an example of a correct git config, see [Setting up GitHub SSH Authentication & SSH Signing](#setting-up-github-ssh-authentication--ssh-signing).
+
+# Benodigdheden TF Pipeline
+- MakesILP (Fusion) doet David
+- SimplifyOperation is makkelijk (check voor TId)
+- SLVOperation: Return altijd Nothing
+- PrettyOp: Al geimplementeerd
+- KernelOperation (TensorKernel)
+    
+    `clusterOperations` en `ClusterOperations` uit `Data.Array.Accelerate.Eval`
+    `compileKernel` uit een type class
+
+    ```hs
+    compileKernel :: Env AccessGroundR env -> Cluster TensorOp args -> Args env args -> TensorKernel env
+    compileKernel env cluster clusterArgs =
+    case clusterOperations cluster clusterArgs of
+        ClusterOperations _ (LeftHandSideWildcard _) [ApplyOperation operation args] -> compileOperation env operation args
+        _ -> internalError "Expected a cluster with one operation"
+
+    compileOperation :: Env AccessGroundR env -> TensorOp args -> Args env args -> TensorKernel env
+    compileOperation = undefined
+    ```
+    - `Array sh a` becomes `ShapeR sh, TypeR a, ExpVars env sh, BaseVar env (Buffers a)`.
+    - If a is a scalar type, then `ScalarType a` instead of TypeR and Buffer instead of Buffers.
+    - The type evidence (TypeR or ScalarType) might already be present somewhere else (in PrimFun for instance), then it can be omitted.
+    ```hs
+    data TensorKernel env where
+    TensorPrimFun :: ShapeR sh -> PrimFun (a -> b) -> ExpVars env sh -> BaseVars env (Buffers a) -> BaseVars env (Buffers b) -> TensorKernel env
+    TensorId :: ShapeR sh -> ScalarType a -> BaseVar env (Buffer a) -> BaseVar env (Buffer b) -> TensorKernel env
+    TensorConst :: ShapeR sh -> ScalarType a -> ExpVars env sh -> a -> BaseVar env (Buffer a) -> TensorKernel env
+    ```
+- PrettyKernel
+- IsSchedule al geimplementeerd (@UniformScheduleFun)
+- PrettySchedule is ook al geimplementeerd
+- IsKernel (zie compileOperation hierboven, etc., )
+- Operation.ShrinkArg (David)
+- Partitioning.BackendClusterArg (David)
+
+### Priorities
+- TF Pipeline
+- Mkgenerate
+- Mkpermute

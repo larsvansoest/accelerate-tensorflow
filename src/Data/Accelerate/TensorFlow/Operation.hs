@@ -39,6 +39,7 @@ import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Smart (typeR, undef)
 import GHC.Conc (TVar(TVar))
+import Data.Array.Accelerate.Pretty.Print (Adoc)
 
 newtype BufferIdx benv a = BIdx (Idx benv (Buffer a)) -- a is enkele binding uit benv
 -- | Environment with indexes pointing to buffers
@@ -67,21 +68,28 @@ distributeBIdx _ _ = error "impossible"
 data ScatterFun where
   ScatterFunAdd :: ScatterFun
   ScatterFunMin :: ScatterFun
+  deriving Show
+
+prettyScatterFun :: ScatterFun -> Adoc
+prettyScatterFun ScatterFunAdd = "ScatterFunAdd"
+prettyScatterFun ScatterFunMin = "ScatterFunMin"
 
 data TensorOp op where
-  TNil :: TensorOp ()
-  TConst :: ScalarType s -> s -> TensorOp (Out sh s -> ())
+  TConstant :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
-  TId :: TensorOp (In sh t -> Out sh t -> ())
+  
+  TId :: TensorOp (In sh a -> Out sh a -> ())
+  TWhere :: TensorOp (In sh a -> Out sh sh -> ()) -- how to include > 0?
+  -- how to encompass TensorFlow shapes, indices? (5, 6) denotes a shape, but [5, 6] too.
+  --TReshape :: ShapeR sh' -> TensorOp (In sh a -> Out sh' a -> ())
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
   TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
 
 instance PrettyOp TensorOp where
-  prettyOp TNil         = "TNil"
-  prettyOp (TConst s e) = vsep ["TConst", prettyConst (TupRsingle s) e]
+  prettyOp (TConstant s e) = vsep ["TConst", prettyConst (TupRsingle s) e]
   prettyOp (TPrimFun f) = vsep ["TBinOp", opName (primOperator f) ]
   prettyOp TId          = "TId"
-  prettyOp (TTensorScatter f) = vsep ["TTensorScatter"]
+  prettyOp (TTensorScatter f) = vsep ["TTensorScatter", viaShow f]
   prettyOp (TBooleanMask t) = vsep ["TBooleanMask"]
 
 instance NFData' TensorOp where
@@ -104,11 +112,11 @@ instance DesugarAcc TensorOp where
 
   -- The combination function is given the new value being permuted as its first argument, 
   -- and the current value of the array as its second.
-  mkPermute
-    comb
+  mkPermute -- hoe til ik dit uit dim1? En is het verder goed?
+    (ArgFun comb)
     defaults@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) _) gv' gvb')
     perm
-    source@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) t) gv gvb)
+    source@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) t) gv gvb) -- reshape x compute (shapeSize)
     | sh <- ShapeRsnoc ShapeRz
     , maybeSh <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh))
     , DeclareVars lhs w k  <- declareVars $ buffersR maybeSh
@@ -122,13 +130,29 @@ instance DesugarAcc TensorOp where
         (ArgArray Out (ArrayR sh maybeSh) (weakenVars w gv) (k weakenId))
       ) $
       aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (fromGrounds (weakenVars w gv))) $
-      Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (booleanMask maybeSh 
-       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w' .> w) gv) (weakenVars w' $ primMaybe1 (TupRpair TupRunit (shapeType sh)) (k weakenId)))
-       _
-       _
+      Alet (LeftHandSideWildcard TupRunit) TupRunit -- toIndex
+      (booleanMask (shapeType sh)                                                    --(weakenVars w' $ isJust (TupRpair TupRunit (shapeType sh)) (k weakenId)))
+       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w' .> w) gv) (isJust (TupRpair TupRunit (shapeType sh)) (k w')))
+       (fromJust (shapeType sh) (k w'))
+       (k' weakenId)
       ) $
-      _
+      aletUnique lhs'' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w' .> w) gv))) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (booleanMask t
+       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w'' .> w' .> w) gv) (isJust (TupRpair TupRunit (shapeType sh)) (k (w'' .> w'))))
+       (weakenVars (w'' .> w' .> w) gvb)
+       (k'' weakenId)
+      ) $
+      Exec (TTensorScatter scatterFun) (
+        ArgArray Mut (ArrayR dim1 t) (weakenVars (w'' .> w' .> w) gv') (weakenVars (w'' .> w' .> w) gvb') :>: 
+        ArgArray In  (ArrayR dim1 (shapeType sh)) (weakenVars (w'' .> w' .> w) gv) (k' w'') :>:
+        ArgArray In  (ArrayR dim1 t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId) :>: 
+        ArgsNil)
+        where scatterFun = case comb of
+                Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (PrimApp (PrimAdd _) (Pair (Evar (Var _ ZeroIdx)) (Evar (Var _ (SuccIdx ZeroIdx))))))) -> ScatterFunAdd -- swap idx?
+                _ -> error "complex combination for permute not supported" 
+                -- how to pattern match on plus?
+      
       -- aletUnique lhs'' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w' .> w) gv))) $
       -- Alet (LeftHandSideWildcard TupRunit) TupRunit
       -- (Exec
@@ -168,19 +192,19 @@ instance DesugarAcc TensorOp where
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
-booleanMask (TupRsingle s) aOut@(ArgArray _ _ gv _) gvbIn gvbOut = Exec (TBooleanMask s) (ArgArray In (ArrayR dim1 (typeR s)) gv gvbIn :>: aOut :>: ArgArray Out (ArrayR dim1 (typeR s)) gv gvbOut :>: ArgsNil)
+booleanMask t@(TupRsingle s) aOut@(ArgArray _ _ gv _) gvbIn gvbOut = Exec (TBooleanMask s) (ArgArray In (ArrayR dim1 t) gv gvbIn :>: aOut :>: ArgArray Out (ArrayR dim1 t) gv gvbOut :>: ArgsNil)
 booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit 
  (booleanMask t1 aOut gvbIn1 gvbOut1)
  (booleanMask t2 aOut gvbIn2 gvbOut2)
 booleanMask _ _ _ _ = error "impossible"
 
-primMaybe1 :: TypeR a -> GroundVars env (Buffers (Word8, a)) -> GroundVars env (Buffers Word8)
-primMaybe1 _ (TupRpair word8 _) = word8
-primMaybe1 _ _ = error "impossible"
+isJust :: TypeR a -> GroundVars env (Buffers (Word8, a)) -> GroundVars env (Buffers Word8)
+isJust _ (TupRpair word8 _) = word8
+isJust _ _ = error "impossible"
 
-primMaybe2 :: TypeR a -> GroundVars env (Buffers (Word8, ((), a))) -> GroundVars env (Buffers a)
-primMaybe2 _ (TupRpair _ (TupRpair _ a)) = a
-primMaybe2 _ _ = error "impossible"
+fromJust :: TypeR a -> GroundVars env (Buffers (Word8, ((), a))) -> GroundVars env (Buffers a)
+fromJust _ (TupRpair _ (TupRpair _ a)) = a
+fromJust _ _ = error "impossible"
 
 
       -- 3) flatten maybe indices, get boolean mask
@@ -266,7 +290,7 @@ primMaybe2 _ _ = error "impossible"
 
 mkMapF :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' t
   -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
-mkMapF _ (Const s e) aOut = Exec (TConst s e) $ aOut :>: ArgsNil
+mkMapF _ (Const s e) aOut = Exec (TConstant s e) $ aOut :>: ArgsNil
 
 mkMapF env (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp
@@ -358,8 +382,8 @@ newtype TensorFlowKernelMetadata f =
   TensorFlowKernelMetadata { kernelArgsSize :: Int }
 
 instance IsKernel TensorFlowKernel where
-  type KernelOperation TensorFlowKernel = TensorOp
-  type KernelMetadata  TensorFlowKernel = NoKernelMetadata
+  type KernelOperation TensorFlowKernel = TensorOp -- goed
+  type KernelMetadata  TensorFlowKernel = NoKernelMetadata -- goed
   compileKernel = undefined
 
 instance PrettyKernel TensorFlowKernelMetadata where
