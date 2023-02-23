@@ -44,18 +44,18 @@ import Data.Array.Accelerate.Pretty.Print (Adoc)
 data TensorOp op where
   TConstant :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
-  TId :: TensorOp (In sh a -> Out sh a -> ())
-  TWhere :: TensorOp (In sh a -> Out sh sh -> ())
+  TId :: ScalarType s -> TensorOp (In sh s -> Out sh s -> ())
+  TWhere :: TensorOp (In sh a -> Out DIM1 sh -> ())
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
   TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
 
 instance PrettyOp TensorOp where
   prettyOp (TConstant s e)    = vsep ["TConst", prettyConst (TupRsingle s) e]
   prettyOp (TPrimFun f)       = vsep ["TBinOp", opName (primOperator f) ]
-  prettyOp TId                = "TId"
+  prettyOp (TId s)            = vsep ["TId", prettyScalarType  s]
   prettyOp TWhere             = "TWhere"
   prettyOp (TTensorScatter f) = vsep ["TTensorScatter", viaShow f]
-  prettyOp (TBooleanMask t)   = vsep ["TBooleanMask"]
+  prettyOp (TBooleanMask s)   = vsep ["TBooleanMask", prettyScalarType s]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
@@ -65,11 +65,30 @@ instance DesugarAcc TensorOp where
     mkMapF (push' Empty (lhs, distributeBIdx t gvb)) body aOut
   mkMap _ _ _ = error "impossible"
 
-  mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv _)
-    | sh' <- shapeType sh
-    , DeclareVars lhs w k <- declareVars $ buffersR sh'
-    = aletUnique lhs (desugarAlloc (ArrayR sh sh') (fromGrounds gv)) $ -- TODO: filling with indices
-      mkMap (weaken w f) (ArgArray In (ArrayR sh sh') (weakenVars w gv) (k weakenId)) (weaken w aOut)
+  mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv gvb)
+    | DeclareVars lhs w k <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+    , DeclareVars lhs' w' k' <- declareVars $ buffersR (shapeType sh)
+    = -- 1) Creating the shape array
+      -- 1.1) Create a Tensor of shape sh with only ones
+      aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds gv)) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (Exec
+        (TConstant scalarTypeInt 1)
+        (ArgArray Out (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars w gv) (k weakenId) :>: ArgsNil)
+      ) $
+      -- 1.2) Apply tf.where to obtain a 1D array of indexes
+      aletUnique lhs' (desugarAlloc (ArrayR dim1 (shapeType sh)) (toDIM1 gv)) $ -- wat te doen met sh ~ dim1 voor gv?
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (Exec
+        TWhere
+        (ArgArray In (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w' .> w) gv) (k w') :>:
+         ArgArray Out (ArrayR dim1 (shapeType sh)) (weakenVars (w' .> w) gv) (k' weakenId) :>: -- wat te doen met sh ~ dim1 voor gv?
+         ArgsNil)
+      ) $
+      _ -- en hoe nu verder?
+      
+       -- TODO: filling with indices
+      --mkMap (weaken w f) (ArgArray In (ArrayR sh sh') (weakenVars w gv) (k weakenId)) (weaken w aOut)
 
   mkPermute -- TODO: support all shapes (not only dim1)
     (ArgFun comb)
@@ -184,7 +203,7 @@ mkMapF env (Evar (Var s idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR
   = let (BIdx idx') = prj' idx env
         gvb'        = TupRsingle (Var groundR idx')
     in  Exec
-          TId
+          (TId s)
           (
             ArgArray In arrayR gv gvb' :>:
             ArgArray Out arrayR gv gvb :>:
@@ -253,3 +272,6 @@ data ScatterFun where
 prettyScatterFun :: ScatterFun -> Adoc
 prettyScatterFun ScatterFunAdd = "ScatterFunAdd"
 prettyScatterFun ScatterFunMin = "ScatterFunMin"
+
+toDIM1 :: GroundVars env sh -> ExpVars env' DIM1
+toDIM1 = _

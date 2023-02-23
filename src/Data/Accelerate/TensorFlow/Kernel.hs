@@ -39,7 +39,7 @@ import Data.Array.Accelerate.AST.Idx
 data TensorKernel env where
   TensorConstant :: ShapeR sh -> ScalarType s -> ExpVars env sh -> s -> BaseVar env (Buffer s) -> TensorKernel env
   TensorPrimFun :: ShapeR sh -> PrimFun (a -> b) -> ExpVars env sh -> BaseVars env (Buffers a) -> BaseVars env (Buffers b) -> TensorKernel env
-  TensorId :: ShapeR sh -> ScalarType a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorId :: ShapeR sh -> ScalarType s -> BaseVar env (Buffer s) -> BaseVar env (Buffer s) -> TensorKernel env
 
 instance NFData' TensorKernel where
   rnf' !_  = () -- is dit goed?
@@ -57,7 +57,7 @@ instance IsKernel TensorKernel where
         ClusterOperations _ (LeftHandSideWildcard _) [ApplyOperation operation args] -> compileOperation env operation args
         _ -> internalError "Expected a cluster with one operation"
 
-instance PrettyKernel TensorFlowKernelMetadata where
+instance PrettyKernel TensorKernel where
   prettyKernel = PrettyKernelBody True $ \_ kernel -> ""
 
 compileOperation :: Env AccessGroundR env -> TensorOp args -> Args env args -> TensorKernel env
@@ -66,7 +66,9 @@ compileOperation _ (TConstant (t :: ScalarType e) s) (ArgArray _ (ArrayR sh a) g
   = TensorConstant sh t (fromGrounds gv) s (groundToBase a gvb)
 compileOperation _ (TPrimFun f) (ArgArray _ (ArrayR sh a) gvIn gvbIn :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _)
   = TensorPrimFun sh f (fromGrounds gvIn) (groundsToBase a gvbIn) (groundsToBase b gvbOut)
-compileOperation env TId args = undefined
+compileOperation _ (TId (t :: ScalarType e)) (ArgArray _ (ArrayR sh a) _ gvbIn :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _) 
+  | Refl <- reprIsSingle @ScalarType @e @Buffer t
+  = TensorId sh t (groundToBase a gvbIn) (groundToBase b gvbOut)
 compileOperation env _ _ = internalError "Operation not yet supported by kernel"
 
 groundToBase :: TypeR a -> GroundVars env (Buffer a) -> BaseVar env (Buffer a)

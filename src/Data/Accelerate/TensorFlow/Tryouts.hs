@@ -37,7 +37,7 @@ mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR sh ty) gvIn gvbIn) argOut
      -- Allocate new array
      aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
      Alet (LeftHandSideWildcard TupRunit) TupRunit
-       (Exec -- Fill new new array with the number 2
+       (Exec -- Fill new array with the number 2
          (TConstant sInt64 2) 
          (ArgArray 
            Out 
