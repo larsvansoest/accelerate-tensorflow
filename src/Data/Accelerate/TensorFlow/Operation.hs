@@ -41,56 +41,21 @@ import Data.Array.Accelerate.Smart (typeR, undef)
 import GHC.Conc (TVar(TVar))
 import Data.Array.Accelerate.Pretty.Print (Adoc)
 
-newtype BufferIdx benv a = BIdx (Idx benv (Buffer a)) -- a is enkele binding uit benv
--- | Environment with indexes pointing to buffers
-
-instance Sink BufferIdx where
-  weaken w (BIdx idx) = BIdx (weaken w idx)
-
--- benv is buffer env
--- env is scalar env
--- in env staat een int, en en benv kan ik op zoek naar een buffer van ints
-type BufferEnv benv env = Env (BufferIdx benv) env
-
-weakenEnv :: Sink f => (env1 :> env') -> Env (f env1) env2 -> Env (f env') env2
-weakenEnv w = mapEnv (weaken w)
-
--- forall is alleen nodig als je @s wilt gebruiken in de method definition
-distributeBIdx :: forall env s. TypeR s -> GroundVars env (Buffers s) -> Distribute (BufferIdx env) s
-distributeBIdx TupRunit _ = ()
-distributeBIdx (TupRsingle s) (TupRsingle (Var _ idx))
-  | Refl <- reprIsSingle @ScalarType @s @(BufferIdx env) s
-  , Refl <- reprIsSingle @ScalarType @s @Buffer s
-  = BIdx idx
-distributeBIdx (TupRpair l1 l2) (TupRpair r1 r2) = (distributeBIdx l1 r1, distributeBIdx l2 r2)
-distributeBIdx _ _ = error "impossible"
-
-data ScatterFun where
-  ScatterFunAdd :: ScatterFun
-  ScatterFunMin :: ScatterFun
-  deriving Show
-
-prettyScatterFun :: ScatterFun -> Adoc
-prettyScatterFun ScatterFunAdd = "ScatterFunAdd"
-prettyScatterFun ScatterFunMin = "ScatterFunMin"
-
 data TensorOp op where
   TConstant :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
-  
   TId :: TensorOp (In sh a -> Out sh a -> ())
-  TWhere :: TensorOp (In sh a -> Out sh sh -> ()) -- how to include > 0?
-  -- how to encompass TensorFlow shapes, indices? (5, 6) denotes a shape, but [5, 6] too.
-  --TReshape :: ShapeR sh' -> TensorOp (In sh a -> Out sh' a -> ())
+  TWhere :: TensorOp (In sh a -> Out sh sh -> ())
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
   TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
 
 instance PrettyOp TensorOp where
-  prettyOp (TConstant s e) = vsep ["TConst", prettyConst (TupRsingle s) e]
-  prettyOp (TPrimFun f) = vsep ["TBinOp", opName (primOperator f) ]
-  prettyOp TId          = "TId"
+  prettyOp (TConstant s e)    = vsep ["TConst", prettyConst (TupRsingle s) e]
+  prettyOp (TPrimFun f)       = vsep ["TBinOp", opName (primOperator f) ]
+  prettyOp TId                = "TId"
+  prettyOp TWhere             = "TWhere"
   prettyOp (TTensorScatter f) = vsep ["TTensorScatter", viaShow f]
-  prettyOp (TBooleanMask t) = vsep ["TBooleanMask"]
+  prettyOp (TBooleanMask t)   = vsep ["TBooleanMask"]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
@@ -103,16 +68,10 @@ instance DesugarAcc TensorOp where
   mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv _)
     | sh' <- shapeType sh
     , DeclareVars lhs w k <- declareVars $ buffersR sh'
-    = aletUnique lhs (desugarAlloc (ArrayR sh sh') (fromGrounds gv)) $ -- missing: filling with indices
+    = aletUnique lhs (desugarAlloc (ArrayR sh sh') (fromGrounds gv)) $ -- TODO: filling with indices
       mkMap (weaken w f) (ArgArray In (ArrayR sh sh') (weakenVars w gv) (k weakenId)) (weaken w aOut)
 
-  -- The result array is initialised with the given defaults and 
-  -- any further values that are permuted into the result array 
-  -- are added to the current value using the given combination function.
-
-  -- The combination function is given the new value being permuted as its first argument, 
-  -- and the current value of the array as its second.
-  mkPermute -- hoe til ik dit uit dim1? En is het verder goed?
+  mkPermute -- TODO: support all shapes (not only dim1)
     (ArgFun comb)
     defaults@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) _) gv' gvb')
     perm
@@ -131,7 +90,7 @@ instance DesugarAcc TensorOp where
       ) $
       aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (fromGrounds (weakenVars w gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit -- toIndex
-      (booleanMask (shapeType sh)                                                    --(weakenVars w' $ isJust (TupRpair TupRunit (shapeType sh)) (k weakenId)))
+      (booleanMask (shapeType sh)                                                  
        (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w' .> w) gv) (isJust (TupRpair TupRunit (shapeType sh)) (k w')))
        (fromJust (shapeType sh) (k w'))
        (k' weakenId)
@@ -151,44 +110,21 @@ instance DesugarAcc TensorOp where
         where scatterFun = case comb of
                 Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (PrimApp (PrimAdd _) (Pair (Evar (Var _ ZeroIdx)) (Evar (Var _ (SuccIdx ZeroIdx))))))) -> ScatterFunAdd -- swap idx?
                 _ -> error "complex combination for permute not supported" 
-                -- how to pattern match on plus?
-      
-      -- aletUnique lhs'' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w' .> w) gv))) $
-      -- Alet (LeftHandSideWildcard TupRunit) TupRunit
-      -- (Exec
-      --   (TBooleanMask t)
-      --   (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb) :>:
-      --     ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w') $ extract1 (TupRpair TupRunit (shapeType sh)) (k weakenId)) :>:
-      --     ArgArray Out (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId) :>:
-      --     ArgsNil))
-      -- (Exec
-      --   (TTensorScatter ScatterFunAdd)
-      --   (ArgArray Mut (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb) :>: 
-      --    ArgArray In (ArrayR sh (shapeType sh)) (weakenVars (w'' .> w' .> w) gv) (weakenVars w'' $ k' weakenId) :>: 
-      --    ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId) :>: ArgsNil)
-      -- )
-
   mkPermute _ _ _ _ = undefined
-    -- = -- 1) allocate perm indices array (maybe sh')
-    --   aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
-    --   Alet (LeftHandSideWildcard TupRunit) TupRunit
-    --   (mkGenerate
-    --     (weaken w perm)
-    --     (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))
-    --   ) $
-    --   aletUnique lhs' (desugarAlloc (ArrayR dim1 (shapeType sh')) (shapeExpVars dim1 (weakenVars w gv))) $
-    --   Alet (LeftHandSideWildcard TupRunit) TupRunit
-    --   (Exec
-    --     TBooleanMask
-    --     (ArgArray In (ArrayR dim1 (shapeType sh')) _ ((\case
-    --       TupRsingle _ -> error "impossible"
-    --       TupRpair _ (TupRpair _ x) -> x
-    --       _ -> error "impossible") (k weakenId)) :>: 
-    --      ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (f (k weakenId)) :>: 
-    --      ArgArray Out (ArrayR dim1 (shapeType sh')) _ (k' weakenId) :>: 
-    --      ArgsNil)
-    --   )
-    --   _
+
+instance SimplifyOperation TensorOp where
+
+instance SLVOperation TensorOp where
+  slvOperation _ = Nothing
+
+instance ShrinkArg (BackendClusterArg TensorOp) where
+  shrinkArg = undefined -- TODO: David
+  deadArg = undefined -- TODO: David
+
+instance NFData' (BackendClusterArg TensorOp) where
+  rnf' = undefined -- TODO: David
+
+-- instance MakesILP TensorOp where TODO: David
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
@@ -205,88 +141,6 @@ isJust _ _ = error "impossible"
 fromJust :: TypeR a -> GroundVars env (Buffers (Word8, ((), a))) -> GroundVars env (Buffers a)
 fromJust _ (TupRpair _ (TupRpair _ a)) = a
 fromJust _ _ = error "impossible"
-
-
-      -- 3) flatten maybe indices, get boolean mask
-      -- aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeWord8)) _) $
-      -- Alet (LeftHandSideWildcard TupRunit) TupRunit
-      -- (mkMap 
-      --   _ 
-      --   (_ (ArgArray In (ArrayR sh maybeSh') _ (k weakenId)))
-      --   (ArgArray Out (ArrayR sh (TupRsingle scalarTypeWord8)) _ (k' weakenId))
-      -- )
-      -- (Exec
-      --   TBooleanMask
-      --   (_ :>: 
-      --    ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) _ (k' weakenId) :>: 
-      --    _ :>: 
-      --    ArgsNil)
-      -- )
-      -- 4) apply boolean mask source and maybe indices
-      -- 5) scatter 
-
-      -- 2) zip with original values (src, maybe sh')
-      -- aletUnique lhs' (desugarAlloc (ArrayR sh (TupRpair sht primMaybeSh')) (fromGrounds (weakenVars w gv))) $
-      -- Alet (LeftHandSideWildcard TupRunit) TupRunit
-      -- (mkZip 
-      --   (weaken (w' .> w) source)
-      --   (ArgArray In (ArrayR sh primMaybeSh') (weakenVars (w' .> w) gv) (k' weakenId)) 
-      --   (ArgArray Out (ArrayR sh (TupRpair _ primMaybeSh')) (weakenVars (w' .> w) gv) (k' weakenId))
-      -- )
-      -- 3) map (src, nothing) -> (default, ?), 
-          --    (src, just j) -> (comb(src, defaults[j]), j)
-      -- (mkZip 
-      --   (weaken w source) 
-      --   (ArgArray In (ArrayR sh primMaybeSh') (weakenVars w gv) (k weakenId)) 
-      --   _
-      -- ) 
-      -- (mkMap 
-      --   _ 
-      --   (ArgArray In (ArrayR sh primMaybeSh') (weakenVars w gv) (k weakenId)) 
-      --   (ArgArray Out (ArrayR sh t) (weakenVars w gv) (k weakenId))
-      -- )
-      --Alet (LeftHandSideWildcard TupRunit) TupRunit
-      --2) fill indices array
-      -- (mkGenerate 
-      --  (weaken w (ArgFun (Lam lhs' $ Body $ (case apply1 primMaybeSh' perm vars of
-      --     Let lhs2 poe poe' -> error "1"
-      --     _ -> error "2"
-      --  )))) --(Alam lhs' $ Abody $ apply1 perm lhs')
-      --  (ArgArray Out (ArrayR sh sh't) (weakenVars w gv) (k weakenId)))
-      --_ 
-
-      --_ --(mkBackpermute (Arg env (Fun' (sh' -> sh))) (Arg env (In sh t)) (Arg env (Out sh' t)) _ _ _ _)
-      --_
-
-
-  --   , sh't <- shapeType sh'
-  --   , sh'mt < (Word8, ((), shapeType sh'))
-  --   , DeclareVars lhs w k <- declareVars primConstType (PrimConst a) sh't
-  --   , LHS shi _ <- mkLHS sh't
-  --   = -- 1) allocate scatter indices array
-  --     aletUnique lhs (desugarAlloc (ArrayR sh (primMaybify sh't)) (fromGrounds gv)) $
-  --     Alet (LeftHandSideWildcard TupRunit) TupRunit
-  --     (mkGenerate (weaken w perm) (ArgArray Out (ArrayR sh sh't) (weakenVars w gv) _))
-  -- --       _
-  --       -- 2) fill 
-          -- mkGenerate (ArgFun $
-          --   Lam lhs $ _
-          -- ) (ArgArray Out arrayR gv' gvb')
-
-        -- 1) allocate array with scatter indices
-        --aletUnique lhs (desugarAlloc (ArrayR sh sh't) (fromGrounds gv)) $
-        -- 2) fill output array with defaults
-        --Alet (LeftHandSideWildcard TupRunit) TupRunit
-        --  (mkGenerate (weaken w perm) (ArgArray Out (ArrayR sh sh't) _ _))
-        --  _
-        -- 3) allocate alternative source array
-        -- 4) fill source array according to perm indices
-        -- 5) 
-
-          --     Alet (LeftHandSideWildcard TupRunit) TupRunit
-          -- (mkGenerate (ArgFun f) (ArgArray Out arrayR gv gvb)) -- \sh -> case perm sh of
-          -- _
-
 
 mkMapF :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' t
   -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
@@ -368,23 +222,34 @@ mkMapF _ _ _ = error "impossible"
 
 -- temp kernel for testing purposes
 
-data TensorFlowKernel env where
-  TensorFlowKernel
-    :: { kernelId       :: Int
-       , kernelFunction :: !(Lifetime (FunPtr  env))
-       }
-    -> TensorFlowKernel env
+newtype BufferIdx benv a = BIdx (Idx benv (Buffer a))
 
-instance NFData' TensorFlowKernel where
-  rnf' (TensorFlowKernel !_ fn) = unsafeGetValue fn `seq` ()
+instance Sink BufferIdx where
+  weaken w (BIdx idx) = BIdx (weaken w idx)
 
-newtype TensorFlowKernelMetadata f =
-  TensorFlowKernelMetadata { kernelArgsSize :: Int }
+-- benv is buffer env
+-- env is scalar env
+-- in env staat een int, en en benv kan ik op zoek naar een buffer van ints
+type BufferEnv benv env = Env (BufferIdx benv) env
 
-instance IsKernel TensorFlowKernel where
-  type KernelOperation TensorFlowKernel = TensorOp -- goed
-  type KernelMetadata  TensorFlowKernel = NoKernelMetadata -- goed
-  compileKernel = undefined
+weakenEnv :: Sink f => (env1 :> env') -> Env (f env1) env2 -> Env (f env') env2
+weakenEnv w = mapEnv (weaken w)
 
-instance PrettyKernel TensorFlowKernelMetadata where
-  prettyKernel = PrettyKernelBody True $ \_ kernel -> ""
+-- forall is alleen nodig als je @s wilt gebruiken in de method definition
+distributeBIdx :: forall env s. TypeR s -> GroundVars env (Buffers s) -> Distribute (BufferIdx env) s
+distributeBIdx TupRunit _ = ()
+distributeBIdx (TupRsingle s) (TupRsingle (Var _ idx))
+  | Refl <- reprIsSingle @ScalarType @s @(BufferIdx env) s
+  , Refl <- reprIsSingle @ScalarType @s @Buffer s
+  = BIdx idx
+distributeBIdx (TupRpair l1 l2) (TupRpair r1 r2) = (distributeBIdx l1 r1, distributeBIdx l2 r2)
+distributeBIdx _ _ = error "impossible"
+
+data ScatterFun where
+  ScatterFunAdd :: ScatterFun
+  ScatterFunMin :: ScatterFun
+  deriving Show
+
+prettyScatterFun :: ScatterFun -> Adoc
+prettyScatterFun ScatterFunAdd = "ScatterFunAdd"
+prettyScatterFun ScatterFunMin = "ScatterFunMin"
