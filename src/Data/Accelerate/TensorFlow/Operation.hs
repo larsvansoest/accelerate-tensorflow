@@ -65,71 +65,81 @@ instance DesugarAcc TensorOp where
     mkMapF (push' Empty (lhs, distributeBIdx t gvb)) body aOut
   mkMap _ _ _ = error "impossible"
 
-  mkGenerate f aOut@(ArgArray _ (ArrayR sh _) gv gvb)
-    | DeclareVars lhs w k <- declareVars $ buffersR (TupRsingle scalarTypeInt)
-    , DeclareVars lhs' w' k' <- declareVars $ buffersR (shapeType sh)
-    = -- 1) Creating the shape array
-      -- 1.1) Create a Tensor of shape sh with only ones
+  mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb)
+    | DeclareVars lhs w k       <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+    , DeclareVars lhs' w' k'    <- declareVars $ buffersR (shapeType sh)
+    , DeclareVars lhs'' w'' k'' <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+    = -- 1) Create a Tensor of shape sh with only ones
       aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
         (TConstant scalarTypeInt 1)
         (ArgArray Out (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars w gv) (k weakenId) :>: ArgsNil)
       ) $
-      -- 1.2) Apply tf.where to obtain a 1D array of indexes
-      aletUnique lhs' (desugarAlloc (ArrayR dim1 (shapeType sh)) (toDIM1 gv)) $ -- wat te doen met sh ~ dim1 voor gv?
+      -- 2) Obtain a 1D array of indexes (tf.where returns list of indices pointing to values > 0)
+      aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (weakenVars w $ fromGrounds gv)) $
+      aletUnique lhs'' (Compute (ShapeSize sh (paramsIn' $ weakenVars (w' .> w) $ fromGrounds gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
         TWhere
-        (ArgArray In (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w' .> w) gv) (k w') :>:
-         ArgArray Out (ArrayR dim1 (shapeType sh)) (weakenVars (w' .> w) gv) (k' weakenId) :>: -- wat te doen met sh ~ dim1 voor gv?
+        (ArgArray In (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w'' .> w' .> w) gv) (k (w'' .> w')) :>:
+         ArgArray Out (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w'') :>:
          ArgsNil)
-      ) $
-      _ -- en hoe nu verder?
-      
-       -- TODO: filling with indices
-      --mkMap (weaken w f) (ArgArray In (ArrayR sh sh') (weakenVars w gv) (k weakenId)) (weaken w aOut)
+      )
+      -- 3) Apply map on array of indices.
+      (mkMap 
+        (weaken (w'' .> w' .> w) f) 
+        (ArgArray In (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w''))
+        (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k'' weakenId)) (weakenVars (w'' .> w' .> w) gvb))) 
 
-  mkPermute -- TODO: support all shapes (not only dim1)
+  mkPermute
     (ArgFun comb)
-    defaults@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) _) gv' gvb')
+    (ArgArray _ (ArrayR sh' _) gv' gvb')
     perm
-    source@(ArgArray _ (ArrayR (ShapeRsnoc ShapeRz) t) gv gvb) -- reshape x compute (shapeSize)
-    | sh <- ShapeRsnoc ShapeRz
-    , maybeSh <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh))
-    , DeclareVars lhs w k  <- declareVars $ buffersR maybeSh
-    , DeclareVars lhs' w' k' <- declareVars $ buffersR (shapeType sh)
-    , DeclareVars lhs'' w'' k'' <- declareVars $ buffersR t
-    = -- 1) allocate permute indices array n
-      aletUnique lhs (desugarAlloc (ArrayR sh maybeSh) (fromGrounds gv)) $
+    (ArgArray _ (ArrayR sh t) gv gvb) -- reshape x compute (shapeSize)
+    | maybeSh'                     <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
+    , DeclareVars lhs w k          <- declareVars $ buffersR maybeSh'
+    , DeclareVars lhs' w' k'       <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+    , DeclareVars lhs'' w'' k''    <- declareVars $ buffersR (shapeType sh')
+    , DeclareVars lhs''' w''' k''' <- declareVars $ buffersR t
+    = -- 1) Create an array of maybeSh' with perm
+      aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (mkGenerate
         (weaken w perm)
-        (ArgArray Out (ArrayR sh maybeSh) (weakenVars w gv) (k weakenId))
+        (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))
       ) $
-      aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (fromGrounds (weakenVars w gv))) $
-      Alet (LeftHandSideWildcard TupRunit) TupRunit -- toIndex
-      (booleanMask (shapeType sh)                                                  
-       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w' .> w) gv) (isJust (TupRpair TupRunit (shapeType sh)) (k w')))
-       (fromJust (shapeType sh) (k w'))
-       (k' weakenId)
+      -- 2) To apply boolean mask with 1D arrays, we need to flatten. Calculate the dim1 size.
+      aletUnique lhs' (Compute (ShapeSize sh (paramsIn' $ weakenVars w $ fromGrounds gv))) $
+      -- 3) Get 1D array of (Just sh'), by applying a boolean mask with predicate isJust.
+      aletUnique lhs'' (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds (weakenVars (w' .> w) gv))) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit 
+      (booleanMask (shapeType sh')
+        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (TupRpair TupRunit (k' w'')) (isJust (TupRpair TupRunit (shapeType sh')) (k (w'' .> w'))))
+        (fromJust (shapeType sh') (k (w'' .> w')))
+        (k'' weakenId)
       ) $
-      aletUnique lhs'' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w' .> w) gv))) $
+      -- 3) Get 1D array of source indices (sh) with perm output (Just sh'), by applying a boolean mask with predicate isJust.
+      aletUnique lhs''' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w'' .> w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (booleanMask t
-       (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w'' .> w' .> w) gv) (isJust (TupRpair TupRunit (shapeType sh)) (k (w'' .> w'))))
-       (weakenVars (w'' .> w' .> w) gvb)
-       (k'' weakenId)
+        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (TupRpair TupRunit (k' (w''' .> w''))) (isJust (TupRpair TupRunit (shapeType sh')) (k (w''' .> w'' .> w'))))
+        (weakenVars (w''' .> w'' .> w' .> w) gvb)
+        (k''' weakenId)
       ) $
+      -- 4) Apply tf.tensor_scatter
       Exec (TTensorScatter scatterFun) (
-        ArgArray Mut (ArrayR dim1 t) (weakenVars (w'' .> w' .> w) gv') (weakenVars (w'' .> w' .> w) gvb') :>: 
-        ArgArray In  (ArrayR dim1 (shapeType sh)) (weakenVars (w'' .> w' .> w) gv) (k' w'') :>:
-        ArgArray In  (ArrayR dim1 t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId) :>: 
-        ArgsNil)
-        where scatterFun = case comb of
-                Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (PrimApp (PrimAdd _) (Pair (Evar (Var _ ZeroIdx)) (Evar (Var _ (SuccIdx ZeroIdx))))))) -> ScatterFunAdd -- swap idx?
+        ArgArray Mut (ArrayR sh' t) (weakenVars (w''' .> w'' .> w' .> w) gv') (weakenVars (w''' .> w'' .> w' .> w) gvb') :>:
+        ArgArray In (ArrayR sh (shapeType sh')) (weakenVars (w''' .> w'' .> w' .> w) gv) (k'' w''') :>:
+        ArgArray In (ArrayR sh t) (weakenVars (w''' .> w'' .> w' .> w) gv) (k''' weakenId) :>:
+        ArgsNil
+      )
+        where scatterFun = case comb of 
+                Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (PrimApp fun (Pair (Evar (Var _ (SuccIdx ZeroIdx))) (Evar (Var _ ZeroIdx)))))) -> case fun of
+                  PrimAdd _ -> ScatterFunAdd
+                  PrimSub _ -> ScatterFunMin
+                  _         -> error "primfun not yet supported"
                 _ -> error "complex combination for permute not supported" 
-  mkPermute _ _ _ _ = undefined
 
 instance SimplifyOperation TensorOp where
 
@@ -226,7 +236,24 @@ mkMapF _ (VecPack _ _) _ = undefined
 mkMapF _ (VecUnpack _ _) _ = undefined
 mkMapF _ (IndexSlice _ _ _) _ = undefined
 mkMapF _ (IndexFull _ _ _) _ = undefined
-mkMapF _ (ToIndex _ _ _) _ = undefined -- hoe bewijs ik dat sh = sh?
+mkMapF env (ToIndex sh' exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb) = undefined
+-- mkMapF env (ToIndex sh' exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
+--   | DeclareVars lhs w k <- declareVars $ buffersR (shapeType sh') -- geen allocaties, mkMapF aanroepen met als expressie iets met * and + ipv ToIndex.
+--   , DeclareVars lhs' w' k' <- declareVars $ buffersR (shapeType sh')
+--   = aletUnique lhs (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds gv)) $
+--     Alet (LeftHandSideWildcard TupRunit) TupRunit
+--     (mkMapF 
+--       (weakenEnv w env) 
+--       (weakenArrayInstr w exp1) 
+--       (ArgArray Out (ArrayR sh (shapeType sh')) (weakenVars w gv) (k weakenId))) $
+--     aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds (weakenVars w gv))) $
+--     Alet (LeftHandSideWildcard TupRunit) TupRunit
+--     (mkMapF 
+--       (weakenEnv (w' .> w) env) 
+--       (weakenArrayInstr (w' .> w) exp2) 
+--       (ArgArray Out (ArrayR sh (shapeType sh')) (weakenVars (w' .> w) gv) (k' weakenId))) $
+--     Return _ -- should I recursively calculate with TensorFlow or use Accelerate method?
+
 mkMapF _ (FromIndex _ _ _) _ = undefined
 mkMapF _ (Case _ _ _) _ = undefined
 mkMapF _ (Cond _ _ _) _ = undefined
@@ -238,17 +265,11 @@ mkMapF _ (Undef _) _ = undefined
 mkMapF _ (Coerce _ _ _) _ = undefined
 mkMapF _ _ _ = error "impossible"
 
-
--- temp kernel for testing purposes
-
 newtype BufferIdx benv a = BIdx (Idx benv (Buffer a))
 
 instance Sink BufferIdx where
   weaken w (BIdx idx) = BIdx (weaken w idx)
 
--- benv is buffer env
--- env is scalar env
--- in env staat een int, en en benv kan ik op zoek naar een buffer van ints
 type BufferEnv benv env = Env (BufferIdx benv) env
 
 weakenEnv :: Sink f => (env1 :> env') -> Env (f env1) env2 -> Env (f env') env2
@@ -272,6 +293,3 @@ data ScatterFun where
 prettyScatterFun :: ScatterFun -> Adoc
 prettyScatterFun ScatterFunAdd = "ScatterFunAdd"
 prettyScatterFun ScatterFunMin = "ScatterFunMin"
-
-toDIM1 :: GroundVars env sh -> ExpVars env' DIM1
-toDIM1 = _
