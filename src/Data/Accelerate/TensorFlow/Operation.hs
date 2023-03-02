@@ -166,7 +166,7 @@ instance MakesILP TensorOp where
   mkGraph _ _ _ = mempty
   labelLabelledArg _ _ (L arg l) = LOp arg l ()
   getClusterArg (LOp _ _ ()) = NoFusionArg
-  finalize = foldMap ((int 1 .==.) . manifest)
+  finalize = mempty
   encodeBackendClusterArg NoFusionArg = intHost $(hashQ ("NoFusionArg" :: String))
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
