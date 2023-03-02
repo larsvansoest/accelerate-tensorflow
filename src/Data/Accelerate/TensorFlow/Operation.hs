@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -40,6 +41,11 @@ import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Smart (typeR, undef)
 import GHC.Conc (TVar(TVar))
 import Data.Array.Accelerate.Pretty.Print (Adoc)
+import Data.Array.Accelerate.Trafo.Partitioning.ILP.Labels (LabelledArg(..))
+import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph (LabelledArgOp(..))
+import Data.Array.Accelerate.Trafo.Partitioning.ILP.Solver
+import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
+import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ)
 
 data TensorOp op where
   TConstant :: ScalarType s -> s -> TensorOp (Out sh s -> ())
@@ -147,13 +153,21 @@ instance SLVOperation TensorOp where
   slvOperation _ = Nothing
 
 instance ShrinkArg (BackendClusterArg TensorOp) where
-  shrinkArg = undefined -- TODO: David
-  deadArg = undefined -- TODO: David
+  shrinkArg s NoFusionArg = NoFusionArg
+  deadArg NoFusionArg = NoFusionArg
 
 instance NFData' (BackendClusterArg TensorOp) where
-  rnf' = undefined -- TODO: David
+  rnf' NoFusionArg = ()
 
--- instance MakesILP TensorOp where TODO: David
+instance MakesILP TensorOp where
+  type BackendVar TensorOp = ()
+  type BackendArg TensorOp = ()
+  data BackendClusterArg TensorOp arg = NoFusionArg
+  mkGraph _ _ _ = mempty
+  labelLabelledArg _ _ (L arg l) = LOp arg l ()
+  getClusterArg (LOp _ _ ()) = NoFusionArg
+  finalize = foldMap ((int 1 .==.) . manifest)
+  encodeBackendClusterArg NoFusionArg = intHost $(hashQ ("NoFusionArg" :: String))
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
