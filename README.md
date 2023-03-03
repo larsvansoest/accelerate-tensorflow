@@ -3,35 +3,38 @@ This template contains the basis for an [Accelerate](https://github.com/Accelera
 
 This template will use the interpreter for Accelerate. For CPU and GPU, respectively use this repository's [cpu](https://github.com/larsvansoest/template-accelerate/tree/cpu) and [gpu](https://github.com/larsvansoest/template-accelerate/tree/gpu) branches.
 
-## Setting up the dev environment (Nvidia GPU + Windows 11 + WSL2)
+## Setting up the dev environment
+This repository was developed on a Unix-based system (Ubuntu with WSL 2) using VSCode Remote (ssh / wsl2). The installation instructions below include steps to run and develop the project.
 
-The repository contains [dev container](https://code.visualstudio.com/docs/remote/containers) files to setup a vscode dev container to run [Accelerate](https://github.com/AccelerateHS/accelerate). 
+### Running the project
+Make sure the following is installed on the system.
+- [Gurobi](https://www.gurobi.com/documentation/10.0/quickstart_linux/index.html)
+  > Gurobi requires a license. If there are any issues installing or using Gerobi, consider switching to cbc by following the instructions below.
 
-The environment provides the following features:
-- An Ubuntu container with all the required packages installed to run accelerate.
-- [Cuda](https://docs.nvidia.com/cuda/wsl-user-guide/index.html) support to run [Accelerate](https://github.com/AccelerateHS/accelerate) on the host machine's nvidia gpu from the dev container.
-- [VSCode Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell), with code highlights, hlint and mouse tooltip type inspection.
-- [GitHub SSH Authentication](https://docs.github.com/en/authentication/connecting-to-github-with-ssh) and [GitHub SSH Signing](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
+1. Clone this repository, and run `git submodule update --init --recursive` to load the required submodules. This copies the source of the accelerate project inside of the `extra-deps/accelerate` folder. This allows for easy code inspections and to modify the source when necessary.
 
-### Requirements
-- [Windows 11](https://www.microsoft.com/en-us/windows/windows-11?r=1)
-- [WSL2 with Ubuntu distro](https://docs.microsoft.com/en-us/windows/wsl/install)
+2. Run `stack test` in the project root.
+
+#### Gurobi alternative
+In order to not use Gerobi, modify the following in `/extra-deps/accelerate/src/Data/Array/Accelerate/Trafo/NewNewFusion.hs`
+- Replace the existing `Data.Array.Accelerate.Trafo.Partitioning.ILP `s import with `import Data.Array.Accelerate.Trafo.Partitioning.ILP (gurobiFusion, gurobiFusionF)`.
+- Replace any occurence of `gurobiFusion` with `cbcFusion`, and `gurobiFusionF` with `cbcFusionF`.
+
+### Developing on the project
+Make sure the following is installed on the system.
 - [VSCode](https://code.visualstudio.com/)
-    - With the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) installed.
-- [Docker with WSL2 backend](https://www.docker.com/get-started/)
+- The [VSCode Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell) installed.
 
-### Installation
+1. For starters, install ghcup by following [their installation guide](https://www.haskell.org/ghcup/install/), or by running the command below.
+```sh
+https://www.haskell.org/ghcup/install/
+```
+  > ghcup's script will inform about packages that should be installed on the system, ensure those are installed.
 
-Aside from the GitHub SSH setup steps below, the dev container works right out of the box.
+2. In `extra-deps/accelerate`, create a new file named `stack.yaml` and copy the contents of `stack-8.10.yaml` in there. Then run `stack install` in `extra-deps/accelerate`. When finished hit `ctrl + shift + p` and select `> Reload Window`. The Haskell extension will prompt to install the required stack, click yes on every option. After a while, the code inspection should work for the accelerate source.
 
-Simply open this repository in VSCode with the remote containers extension installed, hit `ctrl + shift + p` and select `Remote-Containers: Rebuild and Reopen in Container`.
-
-After around 10 to 15 minutes of building, the container should be ready to use.
-
-> Note: after (re)building, when first clicking a Haskell file, the Haskell plugin has to compile the package. 
-    In vscode's notifications (footer bar), there will be an indication that it is still loading. This will resolve in around 10-15 minutes and only has to run after the first time of building the container.
-
-    To check the status of compilation, head to `View > OutPut` and select the `Haskell` extension.
+3. Navigate to the repository root, and run `stack install`, verify that the code inspection from the VSCode Haskell extension works accordingly.
+  > this may not always work right from the start, try running `stack setup` or `stack install` or reloading the window until it does. Otherwise, head to the VSCode Haskell Extension settings and set `Manage HLS` to `Ghcup`. To check the status of compilation, head to `View > OutPut` and select the `Haskell` extension.
 
 #### Setting up GitHub SSH Authentication & SSH Signing
 The dev container supports GitHub SSH Authentication and GitHub SSH Signing.
@@ -72,7 +75,7 @@ Setup WSL2 with Ubuntu as follows:
 When in trouble, perhaps the instructions below might help.
 
 #### Verify if GPU is correctly working
-Run the command `nvidia-smi` in the dev container, the result should somewhat similar to the following.
+Run the command `nvidia-smi`, the result should somewhat similar to the following.
 ```
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 515.65.01    Driver Version: 516.94       CUDA Version: 11.7     |
@@ -95,52 +98,6 @@ Run the command `nvidia-smi` in the dev container, the result should somewhat si
 +-----------------------------------------------------------------------------+
 ```
 
-#### HLS Server crashed
-If the Haskell plugin returns `The HLS server crashed 5 times in the past 3 minutes`, open up a terminal and type `stack build`. The plugin should run correctly after reloading the window.
-
-#### File Error Highlight: ensure that ghcide is compiled with the same GHC
-If a file is highlighted with the error `Please ensure that ghcide is compiled with the same GHC`, running `stack build` then closing and opening the file may resolve the issue. Otherwise, reload the window.
-
 #### Git Commit Error: unable to start editor 'editor'
 When merging branches locally, if git throws `unable to start editor 'editor'`, it can not find a suitable editor. To resolve this issue, ensure the git config contains `core.editor = code`. For an example of a correct git config, see [Setting up GitHub SSH Authentication & SSH Signing](#setting-up-github-ssh-authentication--ssh-signing).
-
-# Benodigdheden TF Pipeline
-- MakesILP (Fusion) doet David
-- SimplifyOperation is makkelijk (check voor TId)
-- SLVOperation: Return altijd Nothing
-- PrettyOp: Al geimplementeerd
-- KernelOperation (TensorKernel)
-    
-    `clusterOperations` en `ClusterOperations` uit `Data.Array.Accelerate.Eval`
-    `compileKernel` uit een type class
-
-    ```hs
-    compileKernel :: Env AccessGroundR env -> Cluster TensorOp args -> Args env args -> TensorKernel env
-    compileKernel env cluster clusterArgs =
-    case clusterOperations cluster clusterArgs of
-        ClusterOperations _ (LeftHandSideWildcard _) [ApplyOperation operation args] -> compileOperation env operation args
-        _ -> internalError "Expected a cluster with one operation"
-
-    compileOperation :: Env AccessGroundR env -> TensorOp args -> Args env args -> TensorKernel env
-    compileOperation = undefined
-    ```
-    - `Array sh a` becomes `ShapeR sh, TypeR a, ExpVars env sh, BaseVar env (Buffers a)`.
-    - If a is a scalar type, then `ScalarType a` instead of TypeR and Buffer instead of Buffers.
-    - The type evidence (TypeR or ScalarType) might already be present somewhere else (in PrimFun for instance), then it can be omitted.
-    ```hs
-    data TensorKernel env where
-    TensorPrimFun :: ShapeR sh -> PrimFun (a -> b) -> ExpVars env sh -> BaseVars env (Buffers a) -> BaseVars env (Buffers b) -> TensorKernel env
-    TensorId :: ShapeR sh -> ScalarType a -> BaseVar env (Buffer a) -> BaseVar env (Buffer b) -> TensorKernel env
-    TensorConst :: ShapeR sh -> ScalarType a -> ExpVars env sh -> a -> BaseVar env (Buffer a) -> TensorKernel env
-    ```
-- PrettyKernel
-- IsSchedule al geimplementeerd (@UniformScheduleFun)
-- PrettySchedule is ook al geimplementeerd
-- IsKernel (zie compileOperation hierboven, etc., )
-- Operation.ShrinkArg (David)
-- Partitioning.BackendClusterArg (David)
-
-### Priorities
-- TF Pipeline
-- Mkgenerate
-- Mkpermute
+s

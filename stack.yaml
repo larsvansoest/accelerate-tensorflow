@@ -10,19 +10,6 @@ packages:
 - .
 
 extra-deps:
-- github: AccelerateHS/accelerate-llvm
-  commit: 2cd65569c875477b5250d54f0d0738d8ee28e597
-  subdirs:
-    - accelerate-llvm
-    - accelerate-llvm-native
-    - accelerate-llvm-ptx
-
-- github: llvm-hs/llvm-hs
-  commit: 9db657851caf0aa7805b26bcedbd5f445b70f929
-  subdirs:
-    - llvm-hs-pure
-    - llvm-hs
-
 - cuda-0.11.0.0
 - nvvm-0.10.0.0
 - MIP-0.1.1.0
