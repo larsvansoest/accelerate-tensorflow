@@ -11,7 +11,8 @@ Make sure the following is installed on the system.
 - [Gurobi](https://www.gurobi.com/documentation/10.0/quickstart_linux/index.html)
   > Gurobi requires a license. If there are any issues installing or using Gerobi, consider switching to cbc by following the instructions below.
 
-1. Clone this repository, and run `git submodule update --init --recursive` to load the required submodules. This copies the source of the accelerate project inside of the `extra-deps/accelerate` folder. This allows for easy code inspections and to modify the source when necessary.
+1. Clone this repository, and run `git submodule update --init --recursive --remote` to load the required submodules. This copies the source of the accelerate project inside of the `extra-deps/accelerate` folder. This allows for easy code inspections and to modify the source when necessary.
+  > It is important that `--remote` is added to the submodule command, such that the submodule branch is correctly checked out.
 
 2. Run `stack test` in the project root.
 
