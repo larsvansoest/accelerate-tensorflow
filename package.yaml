@@ -33,7 +33,7 @@ dependencies:
 - base >= 4.7 && < 5
 - accelerate
 - prettyprinter >= 1.7.1
-# - accelerate-llvm-native
+- containers                    >= 0.5 && < 0.7
 # - accelerate-llvm-ptx
 
 library:

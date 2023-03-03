@@ -11,7 +11,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use record patterns" #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -29,15 +28,14 @@ import Data.Array.Accelerate.Representation.Ground
 import Data.Array.Accelerate.Trafo.Desugar
 import Data.Array.Accelerate.Trafo.Exp.Substitution
 import Data.Type.Equality
-import Data.Array.Accelerate.Lifetime
-import Foreign
-import Data.Array.Accelerate.AST.Kernel (NoKernelMetadata)
-import Data.Text.Prettyprint.Doc
 import Data.Array.Accelerate.Pretty.Exp
     ( prettyConst, primOperator )
-import Data.Array.Accelerate.Pretty.Print (Operator(..))
+import Data.Array.Accelerate.Pretty.Print ( Operator(..), Adoc )
 import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
-import Data.Array.Accelerate.Representation.Shape
+import Data.Array.Accelerate.Representation.Shape hiding (fromIndex, toIndex, toIndex, fromIndex)
+import Prelude hiding (exp)
+import Data.Text.Prettyprint.Doc ( vsep, viaShow )
+import Data.Array.Accelerate.Representation.Shape hiding (fromIndex, toIndex)
 import Data.Array.Accelerate.Smart (typeR, undef)
 import GHC.Conc (TVar(TVar))
 import Data.Array.Accelerate.Pretty.Print (Adoc)
@@ -51,17 +49,19 @@ data TensorOp op where
   TConstant :: ScalarType s -> s -> TensorOp (Out sh s -> ())
   TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
   TId :: ScalarType s -> TensorOp (In sh s -> Out sh s -> ())
-  TWhere :: TensorOp (In sh a -> Out DIM1 sh -> ())
+  TWhere :: ScalarType s -> TensorOp (In sh s -> Out DIM1 sh -> ())
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
   TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
+  TSelect :: TensorOp (In sh Bool -> In sh t -> In sh t -> Out sh t -> ())
 
 instance PrettyOp TensorOp where
   prettyOp (TConstant s e)    = vsep ["TConst", prettyConst (TupRsingle s) e]
   prettyOp (TPrimFun f)       = vsep ["TBinOp", opName (primOperator f) ]
-  prettyOp (TId s)            = vsep ["TId", prettyScalarType  s]
-  prettyOp TWhere             = "TWhere"
+  prettyOp (TId s)            = vsep ["TId", prettyScalarType s]
+  prettyOp (TWhere s)         = vsep ["TWhere", prettyScalarType s]
   prettyOp (TTensorScatter f) = vsep ["TTensorScatter", viaShow f]
   prettyOp (TBooleanMask s)   = vsep ["TBooleanMask", prettyScalarType s]
+  prettyOp TSelect            = vsep ["TSelect"]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
@@ -87,22 +87,22 @@ instance DesugarAcc TensorOp where
       aletUnique lhs'' (Compute (ShapeSize sh (paramsIn' $ weakenVars (w' .> w) $ fromGrounds gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
-        TWhere
+        (TWhere scalarTypeInt)
         (ArgArray In (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w'' .> w' .> w) gv) (k (w'' .> w')) :>:
          ArgArray Out (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w'') :>:
          ArgsNil)
       )
       -- 3) Apply map on array of indices.
-      (mkMap 
-        (weaken (w'' .> w' .> w) f) 
+      (mkMap
+        (weaken (w'' .> w' .> w) f)
         (ArgArray In (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w''))
-        (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k'' weakenId)) (weakenVars (w'' .> w' .> w) gvb))) 
+        (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k'' weakenId)) (weakenVars (w'' .> w' .> w) gvb)))
 
   mkPermute
     (ArgFun comb)
     (ArgArray _ (ArrayR sh' _) gv' gvb')
     perm
-    (ArgArray _ (ArrayR sh t) gv gvb) -- reshape x compute (shapeSize)
+    (ArgArray _ (ArrayR sh t) gv gvb)
     | maybeSh'                     <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
     , DeclareVars lhs w k          <- declareVars $ buffersR maybeSh'
     , DeclareVars lhs' w' k'       <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
@@ -119,7 +119,7 @@ instance DesugarAcc TensorOp where
       aletUnique lhs' (Compute (ShapeSize sh (paramsIn' $ weakenVars w $ fromGrounds gv))) $
       -- 3) Get 1D array of (Just sh'), by applying a boolean mask with predicate isJust.
       aletUnique lhs'' (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds (weakenVars (w' .> w) gv))) $
-      Alet (LeftHandSideWildcard TupRunit) TupRunit 
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
       (booleanMask (shapeType sh')
         (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (TupRpair TupRunit (k' w'')) (isJust (TupRpair TupRunit (shapeType sh')) (k (w'' .> w'))))
         (fromJust (shapeType sh') (k (w'' .> w')))
@@ -140,12 +140,12 @@ instance DesugarAcc TensorOp where
         ArgArray In (ArrayR sh t) (weakenVars (w''' .> w'' .> w' .> w) gv) (k''' weakenId) :>:
         ArgsNil
       )
-        where scatterFun = case comb of 
+        where scatterFun = case comb of
                 Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (PrimApp fun (Pair (Evar (Var _ (SuccIdx ZeroIdx))) (Evar (Var _ ZeroIdx)))))) -> case fun of
                   PrimAdd _ -> ScatterFunAdd
                   PrimSub _ -> ScatterFunMin
                   _         -> error "primfun not yet supported"
-                _ -> error "complex combination for permute not supported" 
+                _ -> error "complex combination for permute not supported"
 
 instance SimplifyOperation TensorOp where
 
@@ -172,7 +172,7 @@ instance MakesILP TensorOp where
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
 booleanMask t@(TupRsingle s) aOut@(ArgArray _ _ gv _) gvbIn gvbOut = Exec (TBooleanMask s) (ArgArray In (ArrayR dim1 t) gv gvbIn :>: aOut :>: ArgArray Out (ArrayR dim1 t) gv gvbOut :>: ArgsNil)
-booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit 
+booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit
  (booleanMask t1 aOut gvbIn1 gvbOut1)
  (booleanMask t2 aOut gvbIn2 gvbOut2)
 booleanMask _ _ _ _ = error "impossible"
@@ -239,45 +239,86 @@ mkMapF env (Pair exp1 exp2) (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpai
    (mkMapF env exp1 (ArgArray Out (ArrayR sh t1) gv gvb1))
    (mkMapF env exp2 (ArgArray Out (ArrayR sh t2) gv gvb2))
 
+mkMapF env (ToIndex sh exp1 exp2) aOut
+  | DeclareVars lhs w k <- declareVars $ shapeType sh
+  , DeclareVars lhs' w' k' <- declareVars $ shapeType sh
+  = mkMapF env (Let lhs exp1 (Let lhs' (weakenE w exp2) (toIndex sh (k w') (k' weakenId)))) aOut
+
+mkMapF env (ShapeSize sh exp) aOut
+  | DeclareVars lhs _ k <- declareVars $ shapeType sh
+  = mkMapF env (Let lhs exp (shapeSize sh (k weakenId))) aOut
+
+mkMapF env (FromIndex sh exp1 exp2) aOut
+  | DeclareVars lhs w k <- declareVars $ shapeType sh
+  , DeclareVars lhs' w' k' <- declareVars $ TupRsingle scalarTypeInt
+  = mkMapF env (Let lhs exp1 (Let lhs' (weakenE w exp2) (fromIndex sh (k w') (k' weakenId)))) aOut
+
 -- TODO
+mkMapF _ (ArrayInstr arr exp) _ = case arr of
+  Index (Var groundR idx) -> undefined
+  Parameter (Var s idx)   -> undefined
 
 mkMapF _ (Foreign _ _ _ _) _ = undefined
 mkMapF _ Nil _ = Return TupRunit
---mkMapF env Nil (ArgArray _ arrayR gv gvb) = Return gvb
--- TId (ArgArray In arrayR gv gvb :>: ArgArray Out arrayR gv gvb :>: ArgsNil)
---mkMapF _ Nil (ArgArray _ _ _ gvb) = Return gvb
 mkMapF _ (VecPack _ _) _ = undefined
 mkMapF _ (VecUnpack _ _) _ = undefined
 mkMapF _ (IndexSlice _ _ _) _ = undefined
 mkMapF _ (IndexFull _ _ _) _ = undefined
-mkMapF env (ToIndex sh' exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb) = undefined
--- mkMapF env (ToIndex sh' exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
---   | DeclareVars lhs w k <- declareVars $ buffersR (shapeType sh') -- geen allocaties, mkMapF aanroepen met als expressie iets met * and + ipv ToIndex.
---   , DeclareVars lhs' w' k' <- declareVars $ buffersR (shapeType sh')
---   = aletUnique lhs (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds gv)) $
---     Alet (LeftHandSideWildcard TupRunit) TupRunit
---     (mkMapF 
---       (weakenEnv w env) 
---       (weakenArrayInstr w exp1) 
---       (ArgArray Out (ArrayR sh (shapeType sh')) (weakenVars w gv) (k weakenId))) $
---     aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds (weakenVars w gv))) $
---     Alet (LeftHandSideWildcard TupRunit) TupRunit
---     (mkMapF 
---       (weakenEnv (w' .> w) env) 
---       (weakenArrayInstr (w' .> w) exp2) 
---       (ArgArray Out (ArrayR sh (shapeType sh')) (weakenVars (w' .> w) gv) (k' weakenId))) $
---     Return _ -- should I recursively calculate with TensorFlow or use Accelerate method?
 
-mkMapF _ (FromIndex _ _ _) _ = undefined
 mkMapF _ (Case _ _ _) _ = undefined
-mkMapF _ (Cond _ _ _) _ = undefined
+
+mkMapF env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb) = undefined
+  -- | DeclareVars lhs w k <- declareVars $ buffersR $ TupRsingle scalarTypeWord8
+  -- = aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeWord8)) (fromGrounds gv)) $
+  --   Alet (LeftHandSideWildcard TupRunit) TupRunit
+  --   (mkGenerate 
+  --     (ArgFun $ Lam (LeftHandSideWildcard (shapeType sh)) $ Body _)
+  --     (ArgArray Out (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars w gv) (k weakenId)))
+  --   _
+
 mkMapF _ (While _ _ _) _ = undefined
 mkMapF _ (PrimConst _) _ = undefined
-mkMapF _ (ArrayInstr _ _) _ = undefined
-mkMapF _ (ShapeSize _ _) _ = undefined
+
 mkMapF _ (Undef _) _ = undefined
 mkMapF _ (Coerce _ _ _) _ = undefined
 mkMapF _ _ _ = error "impossible"
+
+shapeSize :: ShapeR sh -> ExpVars env' sh -> PreOpenExp (ArrayInstr env) env' Int
+shapeSize ShapeRz TupRunit                                = Const scalarTypeInt 1
+shapeSize (ShapeRsnoc shr) (TupRpair sh (TupRsingle sz))
+  = PrimApp (PrimMul (IntegralNumType TypeInt))
+      (Pair
+        (shapeSize shr sh)
+        (Evar sz))
+shapeSize _ _                                             = error "impossible"
+
+toIndex :: ShapeR sh -> ExpVars env' sh -> ExpVars env' sh -> PreOpenExp (ArrayInstr env) env' Int
+toIndex ShapeRz TupRunit TupRunit = Const scalarTypeInt 0
+toIndex (ShapeRsnoc shr) (TupRpair sh _) (TupRpair ix (TupRsingle i))
+  = PrimApp (PrimAdd (IntegralNumType TypeInt))
+      (Pair
+        (toIndex shr sh ix)
+        (PrimApp (PrimMul (IntegralNumType TypeInt))
+          (Pair
+            (shapeSize shr sh)
+            (Evar i))))
+toIndex _ _ _                     = error "impossible"
+
+fromIndex :: ShapeR sh -> ExpVars env' sh -> ExpVars env' Int -> PreOpenExp (ArrayInstr env) env' sh
+fromIndex ShapeRz TupRunit _                                = Nil
+fromIndex (ShapeRsnoc shr) (TupRpair sh (TupRsingle sz)) (TupRsingle i)
+  | DeclareVars lhs w k <- declareVars $ TupRsingle scalarTypeInt
+  = Pair
+    (Let 
+      lhs 
+      (PrimApp (PrimQuot TypeInt) (Pair (Evar i) (Evar sz))) 
+      (fromIndex shr (weakenVars w sh) (k weakenId)))
+    (case shr of
+      ShapeRz -> Evar i
+      _       -> PrimApp (PrimRem TypeInt) (Pair (Evar i) (Evar sz))
+    )
+
+fromIndex _ _ _              = error "impossible"
 
 newtype BufferIdx benv a = BIdx (Idx benv (Buffer a))
 
