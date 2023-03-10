@@ -12,7 +12,6 @@ packages:
 extra-deps:
 - cuda-0.11.0.0
 - nvvm-0.10.0.0
-- MIP-0.1.1.0
 - OptDir-0.0.4
 - bytestring-encoding-0.1.0.0
 - extra-deps/accelerate
@@ -21,6 +20,7 @@ extra-deps:
 - extra-deps/tensorflow-haskell/tensorflow-opgen
 - extra-deps/tensorflow-haskell/tensorflow-ops
 - extra-deps/tensorflow-haskell/tensorflow-proto
+- extra-deps/haskell-MIP/MIP
 - proto-lens-0.7.1.2
 - proto-lens-protobuf-types-0.7.1.2
 - proto-lens-protoc-0.7.1.1

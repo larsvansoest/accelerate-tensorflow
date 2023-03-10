@@ -19,13 +19,6 @@ packages:
   original:
     hackage: nvvm-0.10.0.0
 - completed:
-    hackage: MIP-0.1.1.0@sha256:37329fd2cc4fb2ed4706007220af63611b3c6f6b8529db6e8cc9ebd1bcfe720e,4450
-    pantry-tree:
-      sha256: 47658a24a179d26b776bbb74042a78264b0e39311150b1d06606305436826c95
-      size: 2372
-  original:
-    hackage: MIP-0.1.1.0
-- completed:
     hackage: OptDir-0.0.4@sha256:7a59a4e225a1ea402b82377c9057cf258e45d9d7913b2edd010f7ae8b9e4f8af,861
     pantry-tree:
       sha256: 1acdb5033f2f1750e622fb4a2bf5f5de5eac9d3129a61c3b92bfed17f64d6607

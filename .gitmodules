@@ -6,3 +6,8 @@
 [submodule "extra-deps/tensorflow-haskell"]
 	path = extra-deps/tensorflow-haskell
 	url = git@github.com:tensorflow/haskell.git
+
+[submodule "extra-deps/haskell-MIP"]
+	path = extra-deps/haskell-MIP
+	url = git@github.com:dpvanbalen/haskell-MIP.git
+	branch = addZeroes
