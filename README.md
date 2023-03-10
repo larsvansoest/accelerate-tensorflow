@@ -8,6 +8,8 @@ This repository was developed on a Unix-based system (Ubuntu with WSL 2) using V
 Make sure the following packages are installed:
 - `apt install coinor-cbc`
 
+> TODO: Add instructions for TensorFlow GPU requirements
+
 ### Setting up the project
 1. Clone the repository with `git clone git@github.com:larsvansoest/accelerate-tensorflow.git`
 

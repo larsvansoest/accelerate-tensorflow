@@ -29,12 +29,12 @@ done
 
 if [[ $GPU == false ]]
 then
-  echo "[Intall] Installing Tensorflow 2.10.1 (CPU) at $TF2021_DIR"
+  echo "[Install] Installing Tensorflow 2.10.1 (CPU) at $TF2021_DIR"
   curl -O https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-cpu-linux-x86_64-2.10.1.tar.gz
   tar zxf libtensorflow-cpu-linux-x86_64-2.10.1.tar.gz -C $TF2021_DIR
   rm libtensorflow-cpu-linux-x86_64-2.10.1.tar.gz
 else
-  echo "[Intall] Installing Tensorflow 2.10.1 (GPU) at $TF2021_DIR"
+  echo "[Install] Installing Tensorflow 2.10.1 (GPU) at $TF2021_DIR"
   curl -O https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-gpu-linux-x86_64-2.10.1.tar.gz
   tar zxf libtensorflow-gpu-linux-x86_64-2.10.1.tar.gz -C $TF2021_DIR
   rm libtensorflow-gpu-linux-x86_64-2.10.1.tar.gz
