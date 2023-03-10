@@ -34,7 +34,11 @@ dependencies:
 - accelerate
 - prettyprinter >= 1.7.1
 - containers                    >= 0.5 && < 0.7
-# - accelerate-llvm-ptx
+- tensorflow
+- tensorflow-core-ops
+- tensorflow-ops
+- tensorflow-proto
+- vector
 
 library:
   source-dirs: src

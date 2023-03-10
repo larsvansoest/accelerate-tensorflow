@@ -1,13 +1,28 @@
 {-# LANGUAGE TypeApplications #-}
 import Data.Array.Accelerate.Trafo
-import Data.Array.Accelerate
+import Data.Array.Accelerate hiding (Vector)
 import Data.Array.Accelerate.Interpreter
 import Prelude hiding (map, zipWith, (+))
 import Data.Accelerate.TensorFlow.Kernel
 
-main :: IO ()
-main = putStrLn try
+import qualified TensorFlow.Ops                                     as TF
+import qualified TensorFlow.Core                                    as TF
+import qualified TensorFlow.Tensor                                  as TF
+import qualified TensorFlow.Types                                   as TF
+import Data.Vector (Vector)
+import Data.Int
+import qualified TensorFlow.GenOps.Core                             as TF hiding (shape)
 
+type Tensor = TF.Tensor TF.Build
+
+vectorX :: IO (Vector Int64)
+vectorX = do TF.runSession $
+              do TF.run $ TF.constant (TF.Shape [4]) [0, 10, 3, 3]
+
+main :: IO ()
+main = do putStrLn try
+          x <- vectorX
+          print x
 
 try :: String
 -- try = test @UniformScheduleFun @TensorKernel $ x

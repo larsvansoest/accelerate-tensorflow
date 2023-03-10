@@ -16,6 +16,16 @@ extra-deps:
 - OptDir-0.0.4
 - bytestring-encoding-0.1.0.0
 - extra-deps/accelerate
+- extra-deps/tensorflow-haskell/tensorflow
+- extra-deps/tensorflow-haskell/tensorflow-core-ops
+- extra-deps/tensorflow-haskell/tensorflow-opgen
+- extra-deps/tensorflow-haskell/tensorflow-ops
+- extra-deps/tensorflow-haskell/tensorflow-proto
+- proto-lens-0.7.1.2
+- proto-lens-protobuf-types-0.7.1.2
+- proto-lens-protoc-0.7.1.1
+- proto-lens-runtime-0.7.0.3
+- proto-lens-setup-0.4.0.6
 
 # Override default flag values for local packages and extra-deps
 flags:
@@ -46,8 +56,13 @@ ghc-options:
 # arch: x86_64
 #
 # Extra directories used by stack for building
-# extra-include-dirs: [/path/to/dir]
-# extra-lib-dirs: [/path/to/dir]
+extra-lib-dirs:
+    - /usr/local/lib
+    - extra-deps/tf2101/lib
+extra-include-dirs:
+    - /usr/local/include
+    - extra-deps/tensorflow-haskell/tensorflow
+    - extra-deps/tensorflow-haskell/tensorflow/third_party
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
