@@ -16,7 +16,7 @@ unzip -d ~ protoc-3.13.0-linux-x86_64.zip bin/protoc
 chmod 755 $PROTOC_DIR
 rm protoc-3.13.0-linux-x86_64.zip
 
-echo "[Install] Protoc installed, please add $PROTOC_DIR to PATH"
+echo "[Install] Protoc installed, please add ~/bin to PATH"
 
 mkdir -p $TF2021_DIR
 

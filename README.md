@@ -4,12 +4,13 @@ An extension to Accelerate to embed calculations in TensorFlow.
 ## Running the project locally
 This repository was developed on a Unix-based system (Ubuntu with WSL 2) using VSCode Remote (ssh / wsl2). The installation instructions below include steps to run and develop the project.
 
-### Packages
-Make sure the package `coinor-cbc` is installed. 
-
 #### GPU (Nvidia)
-In order to run TensorFlow on a Nvidia GPU, follow the guide below. This requires `Ubuntu 20.04 LTS`. 
+In order to run TensorFlow on a Nvidia GPU, follow the guide below to install cuDNN 8.1.1.33 and CUDA 11.2.
 - https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html
+  > On Ubuntu 20.04, running the script `scripts/ubuntu2004/install-cudnn.sh` should cover the guide.
+- https://docs.nvidia.com/cuda/cuda-installation-guide-linux
+  > Preferably: download the 11.2.0 CUDA toolkit here: https://developer.nvidia.com/cuda-11.2.0-download-archive
+  > Otherwise, for Ubuntu 20.04, running the script `scripts/ubuntu2004/install-cuda.sh` should cover the guide.
 
 ### Setting up the project
 1. Clone the repository with `git clone git@github.com:larsvansoest/accelerate-tensorflow.git`
@@ -18,13 +19,11 @@ In order to run TensorFlow on a Nvidia GPU, follow the guide below. This require
    > Run with flag `-c` to remove previously installed submodules.
      Run with flag `-g` to switch to gurobi instead of cbcFusion.
 
-### Installing the required packages
-Run `scripts/install.sh`.
-  > Run with -g to switch to install TensorFlow for GPU.
+3. Make sure `unzip` is installed. Then run `scripts/install.sh`.
+  > Run with flag `-g` to switch to TensorFlow for GPU.
 
 ### Running the project
-To run the project, run the script `scripts/test.sh`.
-
+Unless using Gurobi, make sure `coinor-cbc, zlib1g-dev, libgl1-mesa-dev freeglut3{,-dev}` are installed. To run the project, run the script `scripts/test.sh`.
 > In case ghc complains that it cannot find the module 'TensorFlow.Internal.Raw', do the following manually:
     ```sh
     stack exec -- c2hs -C -I -C tensorflow -C -I -C tensorflow/third_party tensorflow/src/TensorFlow/Internal/Raw.chs

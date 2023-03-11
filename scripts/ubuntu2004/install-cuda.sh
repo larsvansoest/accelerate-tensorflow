@@ -1,13 +1,7 @@
-export OS=ubuntu2004
-export cudnn_version=8.1.1.33
-export cuda_version=cuda11.2
-
-wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/cuda-${OS}.pin 
-
-sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
-sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/3bf863cc.pub
-sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
+wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
+sudo mv cuda-wsl-ubuntu.pin /etc/apt/preferences.d/cuda-repository-pin-600
+wget https://developer.download.nvidia.com/compute/cuda/11.2.0/local_installers/cuda-repo-wsl-ubuntu-11-2-local_11.2.0-1_amd64.deb
+sudo dpkg -i cuda-repo-wsl-ubuntu-11-2-local_11.2.0-1_amd64.deb
+sudo apt-key add /var/cuda-repo-wsl-ubuntu-11-2-local/7fa2af80.pub
 sudo apt-get update
-
-sudo apt-get install libcudnn8=${cudnn_version}-1+${cuda_version}
-sudo apt-get install libcudnn8-dev=${cudnn_version}-1+${cuda_version}
+sudo apt-get -y install cuda=11.2.0-1
