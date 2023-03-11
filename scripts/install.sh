@@ -1,5 +1,5 @@
 # This script installs the required libraries to run this project.
-# Note: to install tensorflow for gpu, run with `install.sh -g`.
+# Note: Run with -g to switch to install TensorFlow for GPU.
 
 SCRIPT_DIR=$(dirname -- "$0")
 TF2021_DIR="$SCRIPT_DIR/../extra-deps/tf2101"
