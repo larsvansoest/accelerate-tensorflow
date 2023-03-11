@@ -29,6 +29,8 @@ Unless using Gurobi, make sure `coinor-cbc, zlib1g-dev, libgl1-mesa-dev freeglut
     stack exec -- c2hs -C -I -C tensorflow -C -I -C tensorflow/third_party tensorflow/src/TensorFlow/Internal/Raw.chs
     ```
 
+When runing on GPU, you can ignore the could 'NUMA node' info message.
+
 ## Developing the project
 Make sure the following is installed on the system.
 - [VSCode](https://code.visualstudio.com/)
