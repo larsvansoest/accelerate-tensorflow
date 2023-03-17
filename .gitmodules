@@ -1,6 +1,6 @@
 [submodule "extra-deps/accelerate"]
 	path = extra-deps/accelerate
-	url = git@github.com:dpvanbalen/accelerate.git
+	url = git@github.com:larsvansoest/accelerate.git
 	branch = new-pipeline-no-fusion
 	
 [submodule "extra-deps/tensorflow-haskell"]
@@ -9,5 +9,5 @@
 
 [submodule "extra-deps/haskell-MIP"]
 	path = extra-deps/haskell-MIP
-	url = git@github.com:dpvanbalen/haskell-MIP.git
+	url = git@github.com:larsvansoest/haskell-MIP.git
 	branch = addZeroes

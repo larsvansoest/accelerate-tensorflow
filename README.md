@@ -23,7 +23,7 @@ In order to run TensorFlow on a Nvidia GPU, follow the guide below to install cu
   > Run with flag `-g` to switch to TensorFlow for GPU.
 
 ### Running the project
-Unless using Gurobi, make sure `coinor-cbc, zlib1g-dev, libgl1-mesa-dev freeglut3{,-dev}` are installed. To run the project, run the script `scripts/test.sh`.
+Unless using Gurobi, make sure `coinor-cbc, zlib1g-dev, libgl1-mesa-dev freeglut3{,-dev} libsnappy-dev` are installed. To run the project, run the script `scripts/test.sh`.
 > In case ghc complains that it cannot find the module 'TensorFlow.Internal.Raw', do the following manually:
     ```sh
     stack exec -- c2hs -C -I -C tensorflow -C -I -C tensorflow/third_party tensorflow/src/TensorFlow/Internal/Raw.chs

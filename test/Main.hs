@@ -17,7 +17,7 @@ type Tensor = TF.Tensor TF.Build
 
 vectorX :: IO (Vector Int64)
 vectorX = do TF.runSession $
-              do TF.run $ TF.constant (TF.Shape [4]) [0, 10, 3, 3]
+              do TF.run $ TF.constant (TF.Shape [2,2,2]) [0, 10, 3, 3, 0, 10, 3, 3]
 
 main :: IO ()
 main = do putStrLn try
