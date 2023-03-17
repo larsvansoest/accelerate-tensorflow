@@ -20,6 +20,7 @@ import Data.Vector (Vector)
 import Data.Int
 import qualified TensorFlow.GenOps.Core                             as TF hiding (shape, placeholder)
 import Foreign (Ptr, castPtr, Word8)
+import TensorFlow.Tensor
 
 -- 2
 
@@ -29,9 +30,8 @@ toTFShape shR sh = TF.Shape $ fromIntegral <$> shapeToList shR sh
 fromBuffer :: TF.TensorType t => ShapeR sh -> ScalarType t -> sh -> Buffer t -> TF.Tensor TF.Build t
 fromBuffer shR t sh buffer = TF.constant (toTFShape shR sh) $ bufferToList t (size shR sh) buffer
 
-toBuffer :: TF.Tensor TF.Value t -> IO (Buffer t)
-toBuffer = undefined
-
+toBuffer :: ScalarType t -> IO (Vector t) -> IO (Buffer t)
+toBuffer t v = undefined
 
 -- 1 Data.Array.Accelerate.AST.Execute
 -- executeAfunSchedule :: GFunctionR t -> sched kernel () (Scheduled sched t) -> IOFun (Scheduled sched t)

@@ -401,6 +401,7 @@ library
         Data.Array.Accelerate.AST.Partitioned
         Data.Array.Accelerate.AST.Schedule
         Data.Array.Accelerate.AST.Schedule.Uniform
+        Data.Array.Accelerate.AST.Schedule.Sequential
         Data.Array.Accelerate.AST.Var
         Data.Array.Accelerate.Analysis.Hash
         Data.Array.Accelerate.Analysis.Hash.Exp
@@ -421,6 +422,7 @@ library
         Data.Array.Accelerate.Pretty
         Data.Array.Accelerate.Pretty.Schedule
         Data.Array.Accelerate.Pretty.Schedule.Uniform
+        Data.Array.Accelerate.Pretty.Schedule.Sequential
         Data.Array.Accelerate.Representation.Array
         Data.Array.Accelerate.Representation.Elt
         Data.Array.Accelerate.Representation.Ground

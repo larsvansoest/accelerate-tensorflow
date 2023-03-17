@@ -23,7 +23,7 @@ import GHC.Conc (TVar(TVar))
 import Data.Accelerate.TensorFlow.Operation
 import Data.Array.Accelerate
 import Data.Array.Accelerate.AST
-import Data.Array.Accelerate.AST.Schedule.Uniform (BaseVar, BaseVars, fromGrounds, BaseR (BaseRground), Var (Var))
+import Data.Array.Accelerate.AST.Schedule.Uniform (BaseVar, BaseVars, fromGrounds, BaseR (BaseRground), Var (Var), mapArgs)
 import Data.Array.Accelerate.Type (ScalarType (SingleScalarType))
 import Data.Array.Accelerate.Array.Buffer
 import Data.Array.Accelerate.AST.Environment
@@ -35,6 +35,7 @@ import Data.Array.Accelerate.Representation.Array
 import Data.Array.Accelerate.Representation.Type (TupR(TupRsingle, TupRunit, TupRpair), Distributes (reprIsSingle), TypeR)
 import Data.Array.Accelerate.Analysis.Match
 import Data.Array.Accelerate.AST.Idx
+import Data.Array.Accelerate.Trafo.Operation.Substitution
 
 data TensorKernel env where
   TensorConstant :: ShapeR sh -> ScalarType s -> ExpVars env sh -> s -> BaseVar env (Buffer s) -> TensorKernel env
@@ -55,7 +56,13 @@ instance IsKernel TensorKernel where
   compileKernel env cluster clusterArgs =
     case clusterOperations cluster clusterArgs of
         ClusterOperations _ (LeftHandSideWildcard _) [ApplyOperation operation args] -> compileOperation env operation args
-        _ -> internalError "Expected a cluster with one operation"
+        _ -> undefined
+        -- ClusterOperations _ (LeftHandSidePair lhs lhs') [ApplyOperation operation args] -> 
+        --   let w = weakenWithLHS lhs'
+        --       w' = weakenWithLHS lhs
+        --       w'' = w .> w'
+        --   in compileOperation env operation (mapArgs (weaken _) args)
+        -- _ -> undefined
 
 instance PrettyKernel TensorKernel where
   prettyKernel = PrettyKernelBody True $ \_ kernel -> ""

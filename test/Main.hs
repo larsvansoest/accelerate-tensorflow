@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 import Data.Array.Accelerate.Trafo
 import Data.Array.Accelerate hiding (Vector)
-import Data.Array.Accelerate.Interpreter
 import Prelude hiding (map, zipWith, (+))
 import Data.Accelerate.TensorFlow.Kernel
 
@@ -12,6 +11,11 @@ import qualified TensorFlow.Types                                   as TF
 import Data.Vector (Vector)
 import Data.Int
 import qualified TensorFlow.GenOps.Core                             as TF hiding (shape)
+import Data.Array.Accelerate.AST.Schedule.Sequential
+import Data.Array.Accelerate.Pretty.Schedule.Sequential
+import Data.Array.Accelerate.Pretty
+import Data.Array.Accelerate.Pretty.Schedule
+import Data.Accelerate.TensorFlow.Execute
 
 type Tensor = TF.Tensor TF.Build
 
@@ -21,10 +25,10 @@ vectorX = do TF.runSession $
 
 main :: IO ()
 main = do putStrLn try
-          x <- vectorX
-          print x
+          let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
+          putStrLn $ renderForTerminal $ prettySchedule sched
+          executeSequentialSchedule sched
 
-try :: String
 -- try = test @UniformScheduleFun @TensorKernel $ x
 -- try = let zeros :: Acc (Matrix Int) 
 --           zeros = use $ fromList (Z :. 2 :. 3) [0..]
@@ -39,7 +43,8 @@ try :: String
   --         ones = fill (constant (Z:.10)) 0
   --         in test @UniformScheduleFun @TensorFlowKernel $ permute (+) zeros Just_ ones
 
-try = test @UniformScheduleFun @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
+try :: String
+try = test @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
 
 -- try =  test @UniformScheduleFun @TensorKernel $ zipWith @DIM1 @Int (+) (use (fromList (Z :. 10) [0..])) (use (fromList (Z :. 10) [0..]))
 
