@@ -55,35 +55,48 @@ instance IsKernel TensorKernel where
   compileKernel :: Env AccessGroundR env -> Cluster TensorOp args -> Args env args -> TensorKernel env
   compileKernel env cluster clusterArgs =
     case clusterOperations cluster clusterArgs of
-        ClusterOperations _ (LeftHandSideWildcard _) [ApplyOperation operation args] -> compileOperation env operation args
+        ClusterOperations _ (LeftHandSideWildcard _) [ApplyOperation operation args] -> compileOperation operation args
+        --ClusterOperations _ (LeftHandSideSingle _) [ApplyOperation operation args] -> compileOperation weakenId env operation args
+        ClusterOperations _ (LeftHandSidePair lhs lhs') [ApplyOperation operation args] -> f env lhs lhs' $ compileOperation operation args
         _ -> undefined
-        -- ClusterOperations _ (LeftHandSidePair lhs lhs') [ApplyOperation operation args] -> 
-        --   let w = weakenWithLHS lhs'
-        --       w' = weakenWithLHS lhs
-        --       w'' = w .> w'
-        --   in compileOperation env operation (mapArgs (weaken _) args)
-        -- _ -> undefined
+
+-- ?
+f :: Env AccessGroundR env -> LeftHandSide GroundR v1 env env'1 -> LeftHandSide GroundR v2 env'1 env' -> TensorKernel env' -> TensorKernel env
+f env lhs lhs' (TensorConstant sh st expVars s baseVar) = TensorConstant sh st (f' env lhs lhs' expVars) s undefined
+f env lhs lhs' (TensorPrimFun sh f expVars baseVars baseVarsb) = undefined
+f env lhs lhs' (TensorId sh s expVars baseVar baseVarb) = TensorId sh s (f' env lhs lhs' expVars)  undefined  undefined
+
+f' :: Env AccessGroundR env -> LeftHandSide GroundR v1 env env'1 -> LeftHandSide GroundR v2 env'1 env' -> ExpVars env' sh -> ExpVars env sh
+f' env lhs lhs' TupRunit = TupRunit
+f' env lhs lhs' (TupRsingle (Var _ idx)) = undefined
+f' env lhs lhs' (TupRpair l r) = undefined
 
 instance PrettyKernel TensorKernel where
-  prettyKernel = PrettyKernelBody True $ \_ kernel -> ""
+  prettyKernel = PrettyKernelBody True $ \_ kernel -> case kernel of
+    TensorConstant {} -> "TensorConstant"
+    TensorPrimFun {} -> "TensorPrimFun"
+    TensorId {} -> "TensorId"
 
-compileOperation :: Env AccessGroundR env -> TensorOp args -> Args env args -> TensorKernel env
-compileOperation _ (TConstant (t :: ScalarType e) s) (ArgArray _ (ArrayR sh a) gv gvb :>: _)
+compileOperation :: TensorOp args -> Args env args -> TensorKernel env
+compileOperation (TConstant (t :: ScalarType e) s) (ArgArray _ (ArrayR sh a) gv gvb :>: _)
   | Refl <- reprIsSingle @ScalarType @e @Buffer t
   = TensorConstant sh t (fromGrounds gv) s (groundToBase a gvb)
-compileOperation _ (TPrimFun f) (ArgArray _ (ArrayR sh a) gvIn gvbIn :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _)
+compileOperation (TPrimFun f) (ArgArray _ (ArrayR sh a) gvIn gvbIn :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _)
   = TensorPrimFun sh f (fromGrounds gvIn) (groundsToBase a gvbIn) (groundsToBase b gvbOut)
-compileOperation _ (TId (t :: ScalarType e)) (ArgArray _ (ArrayR sh a) gvIn gvbIn :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _) 
+compileOperation (TId (t :: ScalarType e)) (ArgArray _ (ArrayR sh a) gvIn gvbIn :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _)
   | Refl <- reprIsSingle @ScalarType @e @Buffer t
   = TensorId sh t (fromGrounds gvIn) (groundToBase a gvbIn) (groundToBase b gvbOut)
-compileOperation env _ _ = internalError "Operation not yet supported by kernel"
+compileOperation _ _ = internalError "Operation not yet supported by kernel"
+
+
+
 
 groundToBase :: TypeR a -> GroundVars env (Buffer a) -> BaseVar env (Buffer a)
 groundToBase _ (TupRsingle (Var groundR idx)) = Var (BaseRground groundR) idx
 
 groundsToBase :: TypeR a -> GroundVars env (Buffers a) -> BaseVars env (Buffers a)
 groundsToBase _ TupRunit                              = TupRunit
-groundsToBase t@(TupRsingle (st :: ScalarType e)) gvb 
+groundsToBase t@(TupRsingle (st :: ScalarType e)) gvb
   | Refl <- reprIsSingle @ScalarType @e @Buffer st = TupRsingle (groundToBase t gvb)
-groundsToBase (TupRpair t1 t2) (TupRpair gvb1 gvb2)   = TupRpair (groundsToBase t1 gvb1) (groundsToBase t2 gvb2) 
+groundsToBase (TupRpair t1 t2) (TupRpair gvb1 gvb2)   = TupRpair (groundsToBase t1 gvb1) (groundsToBase t2 gvb2)
 groundsToBase _ _                                     = error "impossible"

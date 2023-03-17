@@ -25,6 +25,7 @@ vectorX = do TF.runSession $
 
 main :: IO ()
 main = do putStrLn try
+          --let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
           let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
           putStrLn $ renderForTerminal $ prettySchedule sched
           executeSequentialSchedule sched
