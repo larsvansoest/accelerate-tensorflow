@@ -27,6 +27,9 @@ import TensorFlow.Tensor
 toTFShape :: ShapeR sh -> sh -> TF.Shape
 toTFShape shR sh = TF.Shape $ fromIntegral <$> shapeToList shR sh
 
+-- build ipv value
+-- hoe maak ik de buffer ervan?
+
 fromBuffer :: TF.TensorType t => ShapeR sh -> ScalarType t -> sh -> Buffer t -> TF.Tensor TF.Build t
 fromBuffer shR t sh buffer = TF.constant (toTFShape shR sh) $ bufferToList t (size shR sh) buffer
 

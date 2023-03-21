@@ -6,6 +6,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Data.Accelerate.TensorFlow.Kernel where
 
@@ -14,7 +15,7 @@ import Foreign
 import Data.Array.Accelerate.AST.Kernel (NoKernelMetadata)
 import Data.Text.Prettyprint.Doc
 import Data.Array.Accelerate.Pretty.Exp
-    ( prettyConst, primOperator )
+    ( prettyConst, primOperator, prettyLhs )
 import Data.Array.Accelerate.Pretty.Print (Operator(..))
 import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
 import Data.Array.Accelerate.Representation.Shape
@@ -23,7 +24,7 @@ import GHC.Conc (TVar(TVar))
 import Data.Accelerate.TensorFlow.Operation
 import Data.Array.Accelerate
 import Data.Array.Accelerate.AST
-import Data.Array.Accelerate.AST.Schedule.Uniform (BaseVar, BaseVars, fromGrounds, BaseR (BaseRground), Var (Var), mapArgs)
+import Data.Array.Accelerate.AST.Schedule.Uniform (BaseVar, BaseVars, fromGrounds, BaseR (BaseRground), Var (Var), mapArgs, GLeftHandSide)
 import Data.Array.Accelerate.Type (ScalarType (SingleScalarType))
 import Data.Array.Accelerate.Array.Buffer
 import Data.Array.Accelerate.AST.Environment
@@ -43,39 +44,31 @@ data TensorKernel env where
   TensorId :: ShapeR sh -> ScalarType s -> ExpVars env sh -> BaseVar env (Buffer s) -> BaseVar env (Buffer s) -> TensorKernel env
 
 instance NFData' TensorKernel where
-  rnf' !_  = () -- is dit goed?
+  rnf' !_  = ()
 
 newtype TensorFlowKernelMetadata f =
   TensorFlowKernelMetadata { kernelArgsSize :: Int }
 
 instance IsKernel TensorKernel where
-  type KernelOperation TensorKernel = TensorOp -- goed
-  type KernelMetadata  TensorKernel = NoKernelMetadata -- goed
+  type KernelOperation TensorKernel = TensorOp
+  type KernelMetadata  TensorKernel = NoKernelMetadata
 
   compileKernel :: Env AccessGroundR env -> Cluster TensorOp args -> Args env args -> TensorKernel env
-  compileKernel env cluster clusterArgs =
-    case clusterOperations cluster clusterArgs of
-        ClusterOperations _ (LeftHandSideWildcard _) [ApplyOperation operation args] -> compileOperation operation args
-        --ClusterOperations _ (LeftHandSideSingle _) [ApplyOperation operation args] -> compileOperation weakenId env operation args
-        ClusterOperations _ (LeftHandSidePair lhs lhs') [ApplyOperation operation args] -> f env lhs lhs' $ compileOperation operation args
-        _ -> undefined
+  compileKernel _ cluster clusterArgs 
+    | ClusterOperations _ lhs [ApplyOperation operation args] <- clusterOperations cluster clusterArgs
+    , Just Refl <- wildcards lhs
+    = compileOperation operation args
+  compileKernel _ _ _ = error "impossible, did you use SequentialSchedule?"
 
--- ?
-f :: Env AccessGroundR env -> LeftHandSide GroundR v1 env env'1 -> LeftHandSide GroundR v2 env'1 env' -> TensorKernel env' -> TensorKernel env
-f env lhs lhs' (TensorConstant sh st expVars s baseVar) = TensorConstant sh st (f' env lhs lhs' expVars) s undefined
-f env lhs lhs' (TensorPrimFun sh f expVars baseVars baseVarsb) = undefined
-f env lhs lhs' (TensorId sh s expVars baseVar baseVarb) = TensorId sh s (f' env lhs lhs' expVars)  undefined  undefined
-
-f' :: Env AccessGroundR env -> LeftHandSide GroundR v1 env env'1 -> LeftHandSide GroundR v2 env'1 env' -> ExpVars env' sh -> ExpVars env sh
-f' env lhs lhs' TupRunit = TupRunit
-f' env lhs lhs' (TupRsingle (Var _ idx)) = undefined
-f' env lhs lhs' (TupRpair l r) = undefined
+wildcards :: LeftHandSide a e env env' -> Maybe (env :~: env')
+wildcards (LeftHandSideWildcard _)    = Just Refl
+wildcards (LeftHandSidePair lhs lhs')
+ | Just Refl <- wildcards lhs
+ , Just Refl <- wildcards lhs'        = Just Refl
+wildcards _                           = Nothing
 
 instance PrettyKernel TensorKernel where
-  prettyKernel = PrettyKernelBody True $ \_ kernel -> case kernel of
-    TensorConstant {} -> "TensorConstant"
-    TensorPrimFun {} -> "TensorPrimFun"
-    TensorId {} -> "TensorId"
+  prettyKernel = PrettyKernelBody True $ \_ kernel -> ""
 
 compileOperation :: TensorOp args -> Args env args -> TensorKernel env
 compileOperation (TConstant (t :: ScalarType e) s) (ArgArray _ (ArrayR sh a) gv gvb :>: _)
@@ -88,15 +81,12 @@ compileOperation (TId (t :: ScalarType e)) (ArgArray _ (ArrayR sh a) gvIn gvbIn 
   = TensorId sh t (fromGrounds gvIn) (groundToBase a gvbIn) (groundToBase b gvbOut)
 compileOperation _ _ = internalError "Operation not yet supported by kernel"
 
-
-
-
 groundToBase :: TypeR a -> GroundVars env (Buffer a) -> BaseVar env (Buffer a)
 groundToBase _ (TupRsingle (Var groundR idx)) = Var (BaseRground groundR) idx
 
 groundsToBase :: TypeR a -> GroundVars env (Buffers a) -> BaseVars env (Buffers a)
 groundsToBase _ TupRunit                              = TupRunit
 groundsToBase t@(TupRsingle (st :: ScalarType e)) gvb
-  | Refl <- reprIsSingle @ScalarType @e @Buffer st = TupRsingle (groundToBase t gvb)
+  | Refl <- reprIsSingle @ScalarType @e @Buffer st    = TupRsingle (groundToBase t gvb)
 groundsToBase (TupRpair t1 t2) (TupRpair gvb1 gvb2)   = TupRpair (groundsToBase t1 gvb1) (groundsToBase t2 gvb2)
 groundsToBase _ _                                     = error "impossible"
