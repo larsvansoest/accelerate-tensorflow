@@ -1,7 +1,17 @@
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use record patterns" #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE InstanceSigs #-}
 module Data.Accelerate.TensorFlow.Execute where
 import Data.Array.Accelerate.AST.Schedule.Sequential
 import Data.Accelerate.TensorFlow.Kernel
@@ -22,8 +32,11 @@ import Data.Int
 import qualified TensorFlow.GenOps.Core                             as TF hiding (shape, placeholder)
 import Data.IORef
 import Data.Array.Accelerate.Array.Buffer
-import Data.Array.Accelerate.AST.Environment
+import Data.Array.Accelerate.AST.Environment hiding (push)
 import Data.Array.Accelerate.Representation.Type
+import Data.Array.Accelerate.Type
+import Data.Array.Accelerate.Representation.Ground
+import Data.Array.Accelerate.Analysis.Match
 
 -- instance Execute SequentialSchedule TensorKernel where
 --   executeAfunSchedule = undefined
@@ -38,44 +51,40 @@ import Data.Array.Accelerate.Representation.Type
 type TensorEnv = Env TensorValue
 
 data TensorValue a where
-  TVScalar :: a -> TensorValue a
-  TVTensor :: IORef (Either (TF.Tensor TF.Build a) (Vector a)) -> TensorValue (Buffer a)
+  TensorScalar :: a -> TensorValue a
+  TensorBuild :: IORef (Either (TF.Tensor TF.Build a) (Vector a)) -> TensorValue (Buffer a)
+  TensorValue :: IORef (Vector a) -> TensorValue (Buffer a)
   -- misschien undefined omdat bij alloc je een placeholder nodig hebt (TF.placeholder?)
 
 type TensorValues = TupR TensorValue
 
 executeSequentialSchedule :: SequentialSchedule TensorKernel env t -> IO ()
-executeSequentialSchedule = \case
-  SequentialLam lhs ss -> undefined
-  SequentialBody ss -> executeSeqSchedule ss
+executeSequentialSchedule (SequentialLam lhs sched) = undefined
+executeSequentialSchedule (SequentialBody sched)    = undefined -- executeSeqSchedule sched
 
--- evalArrayInstr :: NativeEnv env -> EvalArrayInstr (ArrayInstr env)
--- evalArrayInstr env = EvalArrayInstr $ \instr arg -> case instr of
---   Index buffer -> indexBuffer (groundRelt $ varType buffer) (prj (varIdx buffer) env) arg
---   Parameter (Var tp ix) -> prjGroundVar (Var (GroundRscalar tp) ix) env
+executeSeqSchedule :: TensorEnv env -> SeqSchedule TensorKernel env t -> IO (TensorValues t)
+executeSeqSchedule env (Exec m fun args) = executeKernel env m fun args
+executeSeqSchedule env (Return tr) = undefined
+executeSeqSchedule env (Compute expr) = return $ TupRsingle (TensorScalar (evalExp expr $ evalArrayInstr env))
+executeSeqSchedule env (Alet lhs _ sched sched') = do
+  rhs <- executeSeqSchedule env sched 
+  let env' = push env (lhs, rhs)
+  executeSeqSchedule env' sched'
+executeSeqSchedule _ (Alloc sr st tr) = undefined
+executeSeqSchedule _ (Use st n bu) = undefined
+executeSeqSchedule _ (Unit var) = undefined
+executeSeqSchedule _ (Acond var ss ss') = undefined
+executeSeqSchedule _ (Awhile tr ssf ssf' tr') = undefined
 
-executeSeqSchedule :: SeqSchedule TensorKernel env t -> IO (TensorValues t)
-executeSeqSchedule = \case  
-  Exec km okf pa -> executeKernel km okf pa
-  Return tr -> undefined
-  Compute exp -> return $ evalExp exp _
-  Alet lhs tr ss ss' -> do executeSeqSchedule ss
-                           executeSeqSchedule ss'
-  Alloc sr st tr -> do putStrLn $ "alloc"
-  Use st n bu -> do putStrLn $ "use"
-  Unit var -> undefined
-  Acond var ss ss' -> undefined
-  Awhile tr ssf ssf' tr' -> undefined
+push :: TensorEnv env -> (LeftHandSide s t env env', TensorValues t) -> TensorEnv env'
+push env (LeftHandSideWildcard _, _)            = env
+push env (LeftHandSideSingle _  , TupRsingle a) = env `Push` a
+push env (LeftHandSidePair l1 l2, TupRpair a b) = push env (l1, a) `push` (l2, b)
+push _ _                                        = error "Tuple mismatch"
 
-executeKernel :: NoKernelMetadata f -> KernelFun TensorKernel args -> SArgs env args -> IO ()
-executeKernel m k a = case k of
-  KernelFunLam kar okf -> case okf of
-    KernelFunLam kar' okf' ->  do putStrLn "executeKernel0"
-                                  executeKernelFunLam  kar' okf'
-    KernelFunBody tk -> do putStrLn "executeKernel1"
-                           executeKernel' tk
-  KernelFunBody tk -> do putStrLn "executeKernel2"
-                         executeKernel' tk
+executeKernel :: TensorEnv env -> NoKernelMetadata f -> KernelFun TensorKernel args -> SArgs env args -> IO (TensorValues t)
+executeKernel _ _ (KernelFunLam _ _) _ = undefined
+executeKernel _ _ (KernelFunBody _) _  = undefined
 
 executeKernelFunLam :: KernelArgR t2 r1 -> OpenKernelFun TensorKernel (r, r1) f2 -> IO ()
 executeKernelFunLam kar okf = case okf of
@@ -83,8 +92,14 @@ executeKernelFunLam kar okf = case okf of
                                executeKernelFunLam kar' okf'
   KernelFunBody tk -> executeKernel' tk
 
-executeKernel' :: TensorKernel a -> IO ()
+executeKernel' :: TensorKernel t -> IO (TensorValues t)
 executeKernel' = \case
   TensorConstant sr st tr s var -> do putStrLn $ "TensorConstant"
   TensorPrimFun sr pf tr tr' tr2 -> do putStrLn $ "TensorPrimFun"
   TensorId sr st tr var var' -> do putStrLn $ "TensorId"
+
+evalArrayInstr :: TensorEnv env -> EvalArrayInstr (ArrayInstr env)
+evalArrayInstr env = EvalArrayInstr $ \instr arg -> case instr of
+  Index buffer -> indexBuffer (groundRelt $ varType buffer) (prj' (varIdx buffer) env) arg
+  Parameter (Var _ idx) -> prjGroundVar (Var (GroundRscalar tp) ix) env
+
