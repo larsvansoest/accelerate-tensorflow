@@ -24,6 +24,8 @@ vectorX :: IO (Vector Int64)
 vectorX = do TF.runSession $
               do TF.run $ TF.constant (TF.Shape [2,2,2]) [0, 10, 3, 3, 0, 10, 3, 3]
 
+-- Backend type class
+
 main :: IO ()
 main = do putStrLn try
           --let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
