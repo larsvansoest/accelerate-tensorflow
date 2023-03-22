@@ -37,6 +37,11 @@ import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Type
 import Data.Array.Accelerate.Representation.Ground
 import Data.Array.Accelerate.Analysis.Match
+import Control.Monad.IO.Class
+import Unsafe.Coerce
+import Data.Accelerate.TensorFlow.Tensor hiding (toBuffer)
+import Data.Array.Accelerate.Representation.Shape
+import Data.Array.Accelerate.Trafo.Operation.Substitution
 
 -- instance Execute SequentialSchedule TensorKernel where
 --   executeAfunSchedule = undefined
@@ -48,33 +53,60 @@ import Data.Array.Accelerate.Analysis.Match
 -- buffers staan in 'env', die sla ik op als tensors
 -- scalars staan in 'env' (array groottes, if-else condities), die sla ik op als scalars
 --type mijnEnv :: Env _ env
-type TensorEnv = Env TensorValue
 
-data TensorValue a where
-  TensorScalar :: a -> TensorValue a
-  TensorBuild :: IORef (Either (TF.Tensor TF.Build a) (Vector a)) -> TensorValue (Buffer a)
-  TensorValue :: IORef (Vector a) -> TensorValue (Buffer a)
-  -- misschien undefined omdat bij alloc je een placeholder nodig hebt (TF.placeholder?)
-
-type TensorValues = TupR TensorValue
-
-executeSequentialSchedule :: SequentialSchedule TensorKernel env t -> IO ()
-executeSequentialSchedule (SequentialLam lhs sched) = undefined
-executeSequentialSchedule (SequentialBody sched)    = undefined -- executeSeqSchedule sched
+executeSequentialSchedule :: TensorEnv env -> SequentialSchedule TensorKernel env t -> IO ()
+executeSequentialSchedule env (SequentialLam lhs sched) = executeSequentialSchedule (_ env) sched -- ?
+executeSequentialSchedule env (SequentialBody sched)    = do
+  _ <- executeSeqSchedule env sched
+  return () -- hoe moet ik van TensorValues t naar ()?
 
 executeSeqSchedule :: TensorEnv env -> SeqSchedule TensorKernel env t -> IO (TensorValues t)
 executeSeqSchedule env (Exec m fun args) = executeKernel env m fun args
-executeSeqSchedule env (Return tr) = undefined
-executeSeqSchedule env (Compute expr) = return $ TupRsingle (TensorScalar (evalExp expr $ evalArrayInstr env))
+
+executeSeqSchedule env (Return tr) = return $ prjAll env tr
+  where prjAll :: TensorEnv env -> GroundVars env t -> TensorValues t
+        prjAll _ TupRunit = TupRunit
+        prjAll env (TupRsingle (Var _ idx)) = TupRsingle (prj' idx env)
+        prjAll env (TupRpair v v') = TupRpair (prjAll env v) (prjAll env v')
+
+executeSeqSchedule env (Compute expr) =
+  return (TupRsingle (TensorScalar (evalExp expr (evalArrayInstr env))))
+
 executeSeqSchedule env (Alet lhs _ sched sched') = do
-  rhs <- executeSeqSchedule env sched 
+  rhs <- executeSeqSchedule env sched
   let env' = push env (lhs, rhs)
   executeSeqSchedule env' sched'
-executeSeqSchedule _ (Alloc sr st tr) = undefined
-executeSeqSchedule _ (Use st n bu) = undefined
+
+executeSeqSchedule _ (Alloc shR st vars) = return $ TupRsingle $ TensorValue $ liftIO (TF.placeholder _) -- ?
+
+executeSeqSchedule _ (Use st n buffer) = return $ TupRsingle (TensorBuild' (fromBuffer dim1 st ((), n) buffer))
+
 executeSeqSchedule _ (Unit var) = undefined
+
 executeSeqSchedule _ (Acond var ss ss') = undefined
+
 executeSeqSchedule _ (Awhile tr ssf ssf' tr') = undefined
+
+executeKernel :: TensorEnv env -> NoKernelMetadata f -> KernelFun TensorKernel args -> SArgs env args -> IO (TensorValues t)
+executeKernel env m (KernelFunLam z kernel) args = undefined --executeKernel (_ env) m kernel (_ args)
+executeKernel env m (KernelFunBody kernel) args = undefined --executeKernel' env kernel args
+
+executeKernel' :: TensorEnv env -> TensorKernel env -> SArgs env () -> IO (TensorValues t)
+executeKernel' env (TensorConstant sh st _ s _) args = undefined
+executeKernel' _ _ _ = undefined
+
+-- 
+
+evalArrayInstr :: TensorEnv env -> EvalArrayInstr (ArrayInstr env)
+evalArrayInstr env = EvalArrayInstr $ \instr arg -> case instr of
+  Index buffer -> indexBuffer (groundRelt $ varType buffer) (toBuffer (prj' (varIdx buffer) env)) arg
+  Parameter (Var tp idx) -> prjGroundVar (Var (GroundRscalar tp) idx) env
+
+prjGroundVar :: GroundVar env t -> TensorEnv env -> t
+prjGroundVar (Var _ idx) env = undefined
+
+toBuffer :: TensorValue (Buffer t) -> Buffer t
+toBuffer _ = undefined
 
 push :: TensorEnv env -> (LeftHandSide s t env env', TensorValues t) -> TensorEnv env'
 push env (LeftHandSideWildcard _, _)            = env
@@ -82,24 +114,13 @@ push env (LeftHandSideSingle _  , TupRsingle a) = env `Push` a
 push env (LeftHandSidePair l1 l2, TupRpair a b) = push env (l1, a) `push` (l2, b)
 push _ _                                        = error "Tuple mismatch"
 
-executeKernel :: TensorEnv env -> NoKernelMetadata f -> KernelFun TensorKernel args -> SArgs env args -> IO (TensorValues t)
-executeKernel _ _ (KernelFunLam _ _) _ = undefined
-executeKernel _ _ (KernelFunBody _) _  = undefined
+type TensorEnv = Env TensorValue
 
-executeKernelFunLam :: KernelArgR t2 r1 -> OpenKernelFun TensorKernel (r, r1) f2 -> IO ()
-executeKernelFunLam kar okf = case okf of
-  KernelFunLam kar' okf' -> do putStrLn "KernelFunLam0"
-                               executeKernelFunLam kar' okf'
-  KernelFunBody tk -> executeKernel' tk
+data TensorValue a where
+  TensorScalar :: a -> TensorValue a
+  TensorBuild :: IORef (TF.Tensor TF.Build a) -> TensorValue (Buffer a)
+  TensorBuild' :: TF.Tensor TF.Build a -> TensorValue (Buffer a) -- hulp nodig met IORef
+  TensorValue :: IORef (TF.Tensor TF.Value a) -> TensorValue (Buffer a)
+  -- misschien undefined omdat bij alloc je een placeholder nodig hebt (TF.placeholder?)
 
-executeKernel' :: TensorKernel t -> IO (TensorValues t)
-executeKernel' = \case
-  TensorConstant sr st tr s var -> do putStrLn $ "TensorConstant"
-  TensorPrimFun sr pf tr tr' tr2 -> do putStrLn $ "TensorPrimFun"
-  TensorId sr st tr var var' -> do putStrLn $ "TensorId"
-
-evalArrayInstr :: TensorEnv env -> EvalArrayInstr (ArrayInstr env)
-evalArrayInstr env = EvalArrayInstr $ \instr arg -> case instr of
-  Index buffer -> indexBuffer (groundRelt $ varType buffer) (prj' (varIdx buffer) env) arg
-  Parameter (Var _ idx) -> prjGroundVar (Var (GroundRscalar tp) ix) env
-
+type TensorValues = TupR TensorValue

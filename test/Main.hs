@@ -16,6 +16,7 @@ import Data.Array.Accelerate.Pretty.Schedule.Sequential
 import Data.Array.Accelerate.Pretty
 import Data.Array.Accelerate.Pretty.Schedule
 import Data.Accelerate.TensorFlow.Execute
+import Data.Array.Accelerate.AST.Environment
 
 type Tensor = TF.Tensor TF.Build
 
@@ -26,9 +27,10 @@ vectorX = do TF.runSession $
 main :: IO ()
 main = do putStrLn try
           --let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
-          let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
+          -- let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
+          let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int id (use (fromList (Z :. 10) [0..]))
           putStrLn $ renderForTerminal $ prettySchedule sched
-          executeSequentialSchedule sched
+          executeSequentialSchedule Empty sched
 
 -- try = test @UniformScheduleFun @TensorKernel $ x
 -- try = let zeros :: Acc (Matrix Int) 
@@ -45,7 +47,8 @@ main = do putStrLn try
   --         in test @UniformScheduleFun @TensorFlowKernel $ permute (+) zeros Just_ ones
 
 try :: String
-try = test @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
+--try = test @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
+try = test @SequentialSchedule @TensorKernel $ map @DIM1 @Int id (use (fromList (Z :. 10) [0..]))
 
 -- try =  test @UniformScheduleFun @TensorKernel $ zipWith @DIM1 @Int (+) (use (fromList (Z :. 10) [0..])) (use (fromList (Z :. 10) [0..]))
 
