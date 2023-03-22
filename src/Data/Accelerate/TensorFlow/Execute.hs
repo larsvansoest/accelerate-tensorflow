@@ -46,14 +46,6 @@ import Data.Array.Accelerate.Trafo.Operation.Substitution
 -- instance Execute SequentialSchedule TensorKernel where
 --   executeAfunSchedule = undefined
 
--- Ik heb geprobeerd naar native execute te kijken, en ik denk dat dit de approach is,
--- het voelt alleen wel of er heel veel misschien al door de interpreter gedaan kan worden
--- kloppen de types, mis ik nog iets?
-
--- buffers staan in 'env', die sla ik op als tensors
--- scalars staan in 'env' (array groottes, if-else condities), die sla ik op als scalars
---type mijnEnv :: Env _ env
-
 executeSequentialSchedule :: TensorEnv env -> SequentialSchedule TensorKernel env t -> IO ()
 executeSequentialSchedule env (SequentialLam lhs sched) = executeSequentialSchedule (_ env) sched -- ?
 executeSequentialSchedule env (SequentialBody sched)    = do
@@ -103,10 +95,10 @@ evalArrayInstr env = EvalArrayInstr $ \instr arg -> case instr of
   Parameter (Var tp idx) -> prjGroundVar (Var (GroundRscalar tp) idx) env
 
 prjGroundVar :: GroundVar env t -> TensorEnv env -> t
-prjGroundVar (Var _ idx) env = undefined
+prjGroundVar (Var _ idx) env = undefined -- ?
 
 toBuffer :: TensorValue (Buffer t) -> Buffer t
-toBuffer _ = undefined
+toBuffer _ = undefined -- ?
 
 push :: TensorEnv env -> (LeftHandSide s t env env', TensorValues t) -> TensorEnv env'
 push env (LeftHandSideWildcard _, _)            = env
