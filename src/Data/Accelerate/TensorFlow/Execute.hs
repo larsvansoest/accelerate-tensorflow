@@ -1,18 +1,18 @@
-{-# LANGUAGE BangPatterns      #-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TemplateHaskell #-}
+
+
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use record patterns" #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE InstanceSigs #-}
+
+
 module Data.Accelerate.TensorFlow.Execute where
 import Data.Array.Accelerate.AST.Schedule.Sequential
 import Data.Accelerate.TensorFlow.Kernel
@@ -51,11 +51,11 @@ type TensorEnv = Env TensorValue
 
 data TensorV a where
   TBuild :: TF.Tensor TF.Build a -> TensorV a
-  TValue :: S.Vector a -> TensorV a
+  TVector :: S.Vector a -> TensorV a
   TPlaceholder :: TF.Tensor TF.Value a -> TensorV a
 
 data TensorValue a where
-  TScalar :: a -> TensorValue a
+  TScalar :: a -> TensorValue a -- this should be a scalar?
   TTensor :: (Show a, S.Storable a) => IORef (TensorV a) -> TensorValue (Buffer a)
 
 type TensorValues = TupR TensorValue
@@ -96,7 +96,7 @@ executeSequentialSchedule' _ (Use st n buffer)
   , VectorTypeDict <- vectorTypeDict st
   = do
   x <- fromBuffer dim1 st ((), n) buffer
-  ref <- liftIO $ newIORef $ TValue x
+  ref <- liftIO $ newIORef $ TVector x
   return $ TupRsingle $ TTensor ref
 
 executeSequentialSchedule' _ (Unit var) = undefined
@@ -106,9 +106,18 @@ executeSequentialSchedule' _ (Acond var ss ss') = undefined
 executeSequentialSchedule' _ (Awhile tr ssf ssf' tr') = undefined
 
 executeKernelFun :: TensorEnv env -> KernelFun TensorKernel args -> SArgs env args -> TF.Session (TensorValues ())
-executeKernelFun env (KernelFunLam (KernelArgRscalar _) fun) ((SArgScalar _) :>: args)       = undefined -- executeKernelFun (_ env) fun (_ args)
-executeKernelFun env (KernelFunLam (KernelArgRbuffer _ _) fun) ((SArgBuffer _ (Var gr idx)) :>: args) = undefined -- executeKernelFun (push env (lhs, _)) fun (_ args)
-executeKernelFun _ (KernelFunBody kernel) ArgsNil = executeKernel Empty kernel -- de env moet empty zijn, help
+executeKernelFun = executeKernelFun' Empty
+
+executeKernelFun' :: TensorEnv env' -> TensorEnv env -> OpenKernelFun TensorKernel env' args -> SArgs env args -> TF.Session (TensorValues ())
+executeKernelFun' env' env (KernelFunLam (KernelArgRscalar _) fun) ((SArgScalar (Var st idx)) :>: args)     =
+  let value = prj' idx env in
+    executeKernelFun' (push env' (LeftHandSideSingle st, TupRsingle value)) env fun args
+executeKernelFun' env' env (KernelFunLam (KernelArgRbuffer _ _) fun) ((SArgBuffer _ (Var gr idx)) :>: args) =
+  let value = prj' idx env in
+    executeKernelFun' (push env' (LeftHandSideSingle gr, TupRsingle value)) env fun args
+executeKernelFun' env' _ (KernelFunBody kernel) ArgsNil                                                     = executeKernel env' kernel
+
+ -- de env moet empty zijn, help
 
 executeKernel :: TensorEnv env -> TensorKernel env -> TF.Session (TensorValues ())
 executeKernel env (TensorConstant shR t vars s (Var _ idx))
@@ -127,11 +136,9 @@ executeKernel env (TensorConstant shR t vars s (Var _ idx))
       return TupRunit
     _ -> error "placeholders only"
 
-executeKernel env (TensorPrimFun sr pf tr tr' tr2) = do
-  -- TODO: write to IO ref
+executeKernel env (TensorPrimFun shR fun shVars inVars outVars) =
   return TupRunit
-executeKernel env (TensorId sr st tr var var')     = do
-  -- TODO: write to IO ref
+executeKernel env (TensorId sr st tr var var')     =
   return TupRunit
 
 evalArrayInstr :: TensorEnv env -> ArrayInstr env (s -> t) -> s -> t
@@ -157,20 +164,47 @@ push env (LeftHandSidePair l1 l2, TupRpair a b) = push env (l1, a) `push` (l2, b
 push _ _                                        = error "Tuple mismatch"
 
 printTensorValue :: TensorValue a -> IO ()
-printTensorValue (TScalar s) = do putStr "TSCALAR"
+printTensorValue (TScalar s) = putStr "TSCALAR" -- how do I print s?
 printTensorValue (TTensor ref) = do
   x <- readIORef ref
   case x of
     TBuild _ -> putStr "BUILD"
-    TValue vec -> putStr $ show vec
+    TVector vec -> putStr $ show vec
     TPlaceholder ten -> putStr "PLACEHOLDER"
 
 printTensorValues :: TensorValues a -> IO ()
-printTensorValues TupRunit        = do putStr "()"
-printTensorValues (TupRsingle t)  = do printTensorValue t
+printTensorValues TupRunit        = putStr "()"
+printTensorValues (TupRsingle t)  = printTensorValue t
 printTensorValues (TupRpair t t') = do putStr "("
                                        printTensorValues t
                                        putStr ","
                                        printTensorValues t'
                                        putStr ")"
 
+showScalar :: ScalarType e -> e -> String
+showScalar (SingleScalarType t) e = showSingle t e
+showScalar (VectorScalarType t) e = undefined
+
+showSingle :: SingleType e -> e -> String
+showSingle (NumSingleType t) = showNum t
+
+showNum :: NumType e -> e -> String
+showNum (IntegralNumType t) e = showIntegral t e
+showNum (FloatingNumType t) e = showFloating t e
+
+showIntegral :: IntegralType e -> e -> String
+showIntegral TypeInt{}    e = show e
+showIntegral TypeInt8{}   e = show e
+showIntegral TypeInt16{}  e = show e
+showIntegral TypeInt32{}  e = show e
+showIntegral TypeInt64{}  e = show e
+showIntegral TypeWord{}   e = show e
+showIntegral TypeWord8{}  e = show e
+showIntegral TypeWord16{} e = show e
+showIntegral TypeWord32{} e = show e
+showIntegral TypeWord64{} e = show e
+
+showFloating :: FloatingType e -> e -> String
+showFloating TypeHalf{}   e = show e
+showFloating TypeFloat{}  e = show e
+showFloating TypeDouble{} e = show e
