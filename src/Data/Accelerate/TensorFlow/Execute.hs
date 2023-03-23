@@ -11,6 +11,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use record patterns" #-}
+{-# LANGUAGE BangPatterns #-}
 
 
 module Data.Accelerate.TensorFlow.Execute where
@@ -46,6 +47,8 @@ import qualified Data.Vector.Storable as S
 import Control.Concurrent.MVar
 import Data.Accelerate.TensorFlow.Type
 import Data.Array.Accelerate.Trafo.Var
+
+-- why does it not fully evaluate writeIOref, undefined, etc?
 
 type TensorEnv = Env TensorValue
 
