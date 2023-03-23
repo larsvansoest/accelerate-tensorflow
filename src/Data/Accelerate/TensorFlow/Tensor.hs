@@ -40,12 +40,23 @@ fromBuffer :: (TF.TensorType t, S.Storable t, TF.TensorDataType S.Vector t) =>
   sh -> 
   Buffer t ->
   TF.Session (S.Vector t)
-fromBuffer shR t sh buffer = TF.runSession $ do
+fromBuffer shR t sh buffer = do
   let shape = toTFShape shR sh
-  x <- TF.placeholder shape
-  let vec = S.fromList (bufferToList t (size shR sh) buffer)
-  let feeds = [ TF.feed x $ TF.encodeTensorData shape vec ]
-  TF.runWithFeeds feeds $ TF.identity x
+  tensorData <- toTensorData t shape (size shR sh) buffer
+  TF.runSession $ do
+    x <- TF.placeholder shape
+    let feeds = [ TF.feed x tensorData ]
+    TF.runWithFeeds feeds $ TF.identity x
+
+toTensorData :: (TF.TensorType t, S.Storable t, TF.TensorDataType S.Vector t) =>
+  ScalarType t -> 
+  TF.Shape ->
+  Int ->
+  Buffer t ->
+  TF.Session (TF.TensorData t)
+toTensorData t sh n buffer = do 
+  let vec = S.fromList (bufferToList t n buffer)
+  return $ TF.encodeTensorData sh vec
 
 toBuffer :: ScalarType t -> IO (V.Vector t) -> IO (Buffer t)
 toBuffer t v = undefined
