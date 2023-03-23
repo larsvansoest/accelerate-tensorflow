@@ -27,7 +27,7 @@ import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Schedule.Uniform (BaseVar, BaseVars, fromGrounds, BaseR (BaseRground), Var (Var), mapArgs, GLeftHandSide)
 import Data.Array.Accelerate.Type (ScalarType (SingleScalarType))
 import Data.Array.Accelerate.Array.Buffer
-import Data.Array.Accelerate.AST.Environment
+import Data.Array.Accelerate.AST.Environment hiding (Val)
 import Data.Array.Accelerate.AST.Partitioned
 import Data.Array.Accelerate.Eval
 import Data.Array.Accelerate.AST.LeftHandSide
@@ -37,6 +37,7 @@ import Data.Array.Accelerate.Representation.Type (TupR(TupRsingle, TupRunit, Tup
 import Data.Array.Accelerate.Analysis.Match
 import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.Trafo.Operation.Substitution
+import Data.Array.Accelerate.Pretty.Print
 
 data TensorKernel env where
   TensorConstant :: ShapeR sh -> ScalarType s -> ExpVars env sh -> s -> BaseVar env (Buffer s) -> TensorKernel env
@@ -68,7 +69,12 @@ wildcards (LeftHandSidePair lhs lhs')
 wildcards _                           = Nothing
 
 instance PrettyKernel TensorKernel where
-  prettyKernel = PrettyKernelBody True $ \_ kernel -> ""
+  prettyKernel = PrettyKernelBody True prettyKernel'
+
+prettyKernel' :: Val env -> TensorKernel env -> Adoc
+prettyKernel' _ (TensorConstant sr st tr s var)  = vsep [ "TensorConstant" ]
+prettyKernel' _ (TensorPrimFun sr pf tr tr' tr2) = vsep [ "TensorPrimFun" ]
+prettyKernel' _ (TensorId sr st tr var var')     = vsep [ "TensorId" ]
 
 compileOperation :: TensorOp args -> Args env args -> TensorKernel env
 compileOperation (TConstant (t :: ScalarType e) s) (ArgArray _ (ArrayR sh a) gv gvb :>: _)
