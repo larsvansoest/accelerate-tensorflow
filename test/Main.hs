@@ -32,7 +32,8 @@ vectorX = do TF.runSession $
 -- Backend type class
 
 main :: IO ()
-main = do let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int64 (\x -> x + 1) (use (fromList (Z :. 10) [0..]))
+main = do putStrLn try
+          let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int64 (\x -> x + 1) (use (fromList (Z :. 10) [0..]))
           putStrLn $ renderForTerminal $ prettySchedule sched
           let inputTensorValues = undefined :: TensorValues (MVar (((), Int), Buffer Int64))
           executeSequentialSchedule Empty sched inputTensorValues
@@ -53,7 +54,7 @@ main = do let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 
 
 try :: String
 --try = test @SequentialSchedule @TensorKernel $ map @DIM1 @Int (\x -> (x + 1) * 2) (use (fromList (Z :. 10) [0..]))
-try = test @SequentialSchedule @TensorKernel $ map @DIM1 @Int64 id (use (fromList (Z :. 10) [0..]))
+try = test @SequentialSchedule @TensorKernel $ map @DIM1 @Int64 (\x -> x + 1) (use (fromList (Z :. 10) [0..]))
 
 -- try =  test @UniformScheduleFun @TensorKernel $ zipWith @DIM1 @Int (+) (use (fromList (Z :. 10) [0..])) (use (fromList (Z :. 10) [0..]))
 

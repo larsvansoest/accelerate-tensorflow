@@ -42,7 +42,10 @@ import Data.Array.Accelerate.Pretty.Print
 data TensorKernel env where
   TensorConstant :: ShapeR sh -> ScalarType s -> ExpVars env sh -> s -> BaseVar env (Buffer s) -> TensorKernel env
   TensorPrimFun :: ShapeR sh -> PrimFun (a -> b) -> ExpVars env sh -> BaseVars env (Buffers a) -> BaseVars env (Buffers b) -> TensorKernel env
+  -- PrimDivMod   :: IntegralType a -> PrimFun ((a, a)   -> (a, a)) twee resultaten, daarom meervoud
+  -- er zijn methodes om scalartypes van args of resultaat geven 'primfunType'
   TensorId :: ShapeR sh -> ScalarType s -> ExpVars env sh -> BaseVar env (Buffer s) -> BaseVar env (Buffer s) -> TensorKernel env
+  -- waarom expVars bij sommigen en bij andere expVar?
 
 instance NFData' TensorKernel where
   rnf' !_  = ()

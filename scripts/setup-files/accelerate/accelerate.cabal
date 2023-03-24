@@ -482,6 +482,7 @@ library
         Data.Array.Accelerate.Pretty.Print
         Data.Array.Accelerate.Pretty.Type
         Data.Array.Accelerate.Pretty.Exp
+        Data.Array.Accelerate.Pretty.Operation
 
   other-modules:
         Data.Array.Accelerate.Analysis.Hash.TH
@@ -521,7 +522,6 @@ library
         Data.Array.Accelerate.Pretty.Graphviz
         Data.Array.Accelerate.Pretty.Graphviz.Monad
         Data.Array.Accelerate.Pretty.Graphviz.Type
-        Data.Array.Accelerate.Pretty.Operation
         Data.Array.Accelerate.Pretty.Partitioned
         Data.Array.Accelerate.Trafo.Exp.Algebra
         Data.Array.Accelerate.Trafo.Environment
