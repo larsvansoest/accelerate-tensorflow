@@ -57,6 +57,9 @@ tensorTypeDict (SingleScalarType single)                = singleDict single
           TypeDouble -> TensorTypeDict
 tensorTypeDict (VectorScalarType (VectorType _ single)) = undefined -- ? singleTensorDict single
 
+tensorTypeDict' :: NumType a -> TensorTypeDict a
+tensorTypeDict' = undefined
+
 vectorTypeDict :: ScalarType a -> VectorTypeDict a
 vectorTypeDict (SingleScalarType single)                = singleDict single
   where singleDict :: SingleType a -> VectorTypeDict a
@@ -77,3 +80,5 @@ vectorTypeDict (SingleScalarType single)                = singleDict single
           TypeDouble -> VectorTypeDict
 vectorTypeDict (VectorScalarType (VectorType _ single)) = undefined -- ? singleTensorDict single
 
+vectorTypeDict' :: NumType a -> VectorTypeDict a
+vectorTypeDict' = undefined

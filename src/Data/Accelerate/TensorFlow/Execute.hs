@@ -65,9 +65,18 @@ data TensorV a where
   TVector :: S.Vector a -> TensorV a
   TNil :: TensorV a
 
+buildTensor :: (S.Storable a, TF.TensorDataType S.Vector a) => TF.Shape -> TensorV a -> TF.Tensor TF.Build a
+buildTensor _ TNil           = error "can not build TNil"
+buildTensor _ (TBuild build) = build
+buildTensor sh (TVector vec) = TF.constant sh $ S.toList vec
+
 data TensorValue a where
   TScalar :: TypeR a -> a -> TensorValue a
-  TTensor :: (Show a, S.Storable a, TF.TensorDataType S.Vector a) => ScalarType a -> TF.Shape -> IORef (TensorV a) -> TensorValue (Buffer a)
+  TTensor :: (TF.TensorType a, Show a, S.Storable a, TF.TensorDataType S.Vector a) => ScalarType a -> TF.Shape -> IORef (TensorV a) -> TensorValue (Buffer a)
+
+fromTTensor :: (TF.TensorType a, Show a, S.Storable a, TF.TensorDataType S.Vector a) => TensorValue (Buffer a) -> (ScalarType a, TF.Shape, IORef (TensorV a))
+fromTTensor (TScalar _ _)       = error "wrong input for fromTTensor" 
+fromTTensor (TTensor st sh ref) = (st, sh, ref)
 
 type TensorValues = TupR TensorValue
 
@@ -146,18 +155,37 @@ executeKernel env (TensorConstant _ t _ s (Var _ idx))
   | TensorTypeDict <- tensorTypeDict t
   , VectorTypeDict <- vectorTypeDict t
   = do
-  let (tensorVRef, TF.Shape sh) = case prj' idx env of
-        TTensor _ sh' ref -> (ref, sh')
-        _                -> error "impossible"
-  let build = TF.fill (TF.vector sh) (TF.scalar s)
-  liftIO $ writeIORef tensorVRef $ TBuild build
+  let (_, TF.Shape sh, ref) = fromTTensor $ prj' idx env
+  liftIO $ writeIORef ref $ TBuild $ TF.fill (TF.vector sh) (TF.scalar s)
   return TupRunit
+
+-- executeKernel env (TensorPrimFun shR (PrimAdd nt) shVars (TupRpair (TupRsingle (Var _ inIdx1)) (TupRsingle (Var _ inIdx2))) (TupRsingle (Var _ outIdx)))
+--   | TensorTypeDict <- tensorTypeDict' nt
+--   , VectorTypeDict <- vectorTypeDict' nt
+--   = do
+--   let (_, sh1, inRef1) = fromTTensor $ prj' inIdx1 env
+--   let (_, sh2, inRef2) = fromTTensor $ prj' inIdx2 env
+--   inValue1 <- liftIO $ readIORef inRef1
+--   inValue2 <- liftIO $ readIORef inRef2
+--   let inTensor1 = buildTensor sh1 inValue1
+--   let inTensor2 = buildTensor sh2 inValue2
+
+--   let (_, _, outRef)   = fromTTensor $ prj' outIdx env
+--   liftIO $ writeIORef outRef $ TBuild $ TF.add inTensor1 inTensor2
+--   return TupRunit
 
 executeKernel env (TensorPrimFun shR fun shVars inVars outVars) =
   return TupRunit
-executeKernel env (TensorId sr st tr var var')     =
-  return TupRunit
 
+executeKernel env (TensorId _ st _ (Var _ inIdx) (Var _ outIdx)) 
+  | TensorTypeDict <- tensorTypeDict st
+  , VectorTypeDict <- vectorTypeDict st
+  = do
+  let (_, sh, inRef) = fromTTensor $ prj' inIdx env
+  let (_, _, outRef) = fromTTensor $ prj' outIdx env
+  inValue <- liftIO $ readIORef inRef
+  liftIO $ writeIORef outRef $ TBuild $ buildTensor sh inValue
+  return TupRunit
 
 getShape :: TensorEnv env -> ShapeR sh -> ExpVars env sh -> IO TF.Shape
 getShape env shR vars = do
