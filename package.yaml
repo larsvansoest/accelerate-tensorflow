@@ -39,6 +39,7 @@ dependencies:
 - tensorflow-ops
 - tensorflow-proto
 - vector
+- bytestring
 
 library:
   source-dirs: src

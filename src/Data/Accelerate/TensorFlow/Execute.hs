@@ -72,10 +72,15 @@ buildTensor sh (TVector vec) = TF.constant sh $ S.toList vec
 
 data TensorValue a where
   TScalar :: TypeR a -> a -> TensorValue a
-  TTensor :: (TF.TensorType a, Show a, S.Storable a, TF.TensorDataType S.Vector a) => ScalarType a -> TF.Shape -> IORef (TensorV a) -> TensorValue (Buffer a)
+  TTensor :: (TF.TensorType a, S.Storable a, TF.TensorDataType S.Vector a) => ScalarType a -> TF.Shape -> IORef (TensorV a) -> TensorValue (Buffer a)
 
-fromTTensor :: (TF.TensorType a, Show a, S.Storable a, TF.TensorDataType S.Vector a) => TensorValue (Buffer a) -> (ScalarType a, TF.Shape, IORef (TensorV a))
-fromTTensor (TScalar _ _)       = error "wrong input for fromTTensor" 
+-- vraag: waarom werkt dit?
+type family ElemType a where
+  ElemType (Buffer a) = a
+  ElemType a = a
+
+fromTTensor :: TensorValue a -> (ScalarType (ElemType a), TF.Shape, IORef (TensorV (ElemType a)))
+fromTTensor (TScalar _ _) = error "wrong input for fromTTensor"
 fromTTensor (TTensor st sh ref) = (st, sh, ref)
 
 type TensorValues = TupR TensorValue
@@ -108,7 +113,7 @@ executeSequentialSchedule' env (Alet lhs _ sched sched') = do
   executeSequentialSchedule' env' sched'
 
 executeSequentialSchedule' env (Alloc shR st vars)
-  | VectorTypeDict <- vectorTypeDict st
+  | TensorTypeDict <- tensorTypeDict st
   = do
   sh <- liftIO $ getShape env shR vars
   ref <- liftIO $ newIORef TNil
@@ -116,7 +121,6 @@ executeSequentialSchedule' env (Alloc shR st vars)
 
 executeSequentialSchedule' _ (Use st n buffer)
   | TensorTypeDict <- tensorTypeDict st
-  , VectorTypeDict <- vectorTypeDict st
   = do
   let sh = TF.Shape [fromIntegral n]
   let build = TF.constant sh $ bufferToList st n buffer
@@ -153,33 +157,51 @@ executeKernelFun' env' _ (KernelFunBody kernel) ArgsNil                         
 executeKernel :: TensorEnv env -> TensorKernel env -> TF.Session (TensorValues ())
 executeKernel env (TensorConstant _ t _ s (Var _ idx))
   | TensorTypeDict <- tensorTypeDict t
-  , VectorTypeDict <- vectorTypeDict t
   = do
   let (_, TF.Shape sh, ref) = fromTTensor $ prj' idx env
   liftIO $ writeIORef ref $ TBuild $ TF.fill (TF.vector sh) (TF.scalar s)
   return TupRunit
 
--- executeKernel env (TensorPrimFun shR (PrimAdd nt) shVars (TupRpair (TupRsingle (Var _ inIdx1)) (TupRsingle (Var _ inIdx2))) (TupRsingle (Var _ outIdx)))
---   | TensorTypeDict <- tensorTypeDict' nt
---   , VectorTypeDict <- vectorTypeDict' nt
---   = do
---   let (_, sh1, inRef1) = fromTTensor $ prj' inIdx1 env
---   let (_, sh2, inRef2) = fromTTensor $ prj' inIdx2 env
---   inValue1 <- liftIO $ readIORef inRef1
---   inValue2 <- liftIO $ readIORef inRef2
---   let inTensor1 = buildTensor sh1 inValue1
---   let inTensor2 = buildTensor sh2 inValue2
+-- vraag 1: hoe voorkom ik zoveel dicts?
+executeKernel env (TensorPrimFun shR (PrimAdd _) shVars (TupRpair (TupRsingle (Var _ inIdx1)) (TupRsingle (Var _ inIdx2))) (TupRsingle (Var _ outIdx)))
+  | (a, sh1, inRef1) <- fromTTensor $ prj' inIdx1 env
+  , (b, sh2, inRef2) <- fromTTensor $ prj' inIdx2 env
+  , TensorTypeDict <- tensorTypeDict a
+  , TensorAddDict <- tensorAddDict a
+  , TensorTypeDict <- tensorTypeDict b
+  , TensorAddDict <- tensorAddDict b
+  = do
+  inValue1 <- liftIO $ readIORef inRef1
+  inValue2 <- liftIO $ readIORef inRef2
+  let inTensor1 = buildTensor sh1 inValue1
+  let inTensor2 = buildTensor sh2 inValue2
 
---   let (_, _, outRef)   = fromTTensor $ prj' outIdx env
---   liftIO $ writeIORef outRef $ TBuild $ TF.add inTensor1 inTensor2
---   return TupRunit
+  let (_, _, outRef) = fromTTensor $ prj' outIdx env
+  liftIO $ writeIORef outRef $ TBuild $ TF.add inTensor1 inTensor2
+  return TupRunit
+
+executeKernel env (TensorPrimFun shR (PrimMul _) shVars (TupRpair (TupRsingle (Var _ inIdx1)) (TupRsingle (Var _ inIdx2))) (TupRsingle (Var _ outIdx)))
+  | (a, sh1, inRef1) <- fromTTensor $ prj' inIdx1 env
+  , (b, sh2, inRef2) <- fromTTensor $ prj' inIdx2 env
+  , TensorTypeDict <- tensorTypeDict a
+  , TensorMulDict <- tensorMulDict a
+  , TensorTypeDict <- tensorTypeDict b
+  , TensorMulDict <- tensorMulDict b
+  = do
+  inValue1 <- liftIO $ readIORef inRef1
+  inValue2 <- liftIO $ readIORef inRef2
+  let inTensor1 = buildTensor sh1 inValue1
+  let inTensor2 = buildTensor sh2 inValue2
+
+  let (_, _, outRef) = fromTTensor $ prj' outIdx env
+  liftIO $ writeIORef outRef $ TBuild $ TF.mul inTensor1 inTensor2
+  return TupRunit
 
 executeKernel env (TensorPrimFun shR fun shVars inVars outVars) =
   return TupRunit
 
 executeKernel env (TensorId _ st _ (Var _ inIdx) (Var _ outIdx)) 
   | TensorTypeDict <- tensorTypeDict st
-  , VectorTypeDict <- vectorTypeDict st
   = do
   let (_, sh, inRef) = fromTTensor $ prj' inIdx env
   let (_, _, outRef) = fromTTensor $ prj' outIdx env
@@ -257,24 +279,25 @@ prettyVectors (TupRpair v1 v2) = do
 
 prettyVector :: ScalarType a -> S.Vector a -> Adoc
 prettyVector st vec 
- | VectorTypeDict <- vectorTypeDict st
+ | TensorTypeDict <- tensorTypeDict st
  = align $ group $ "( " <> vcat (mapTail (", " <>) $ map (fromString . showElt (TupRsingle st)) $ S.toList vec) <> " )"
 
 mapTail :: (a -> a) -> [a] -> [a]
 mapTail f (x:xs) = x : map f xs
 mapTail _ []     = []
 
--- toBuffers :: TensorValues t -> IO (TensorBuffers t)
+-- vraag 2: hulp met buffers maken
+-- toBuffers :: TensorValues a -> IO (TupR Buffer (ElemType a))
 -- toBuffers TupRunit         = return TupRunit
--- toBuffers (TupRsingle v)   = do buffer <- toBuffer _ v
+-- toBuffers (TupRsingle v)   = do buffer <- toBuffer v
 --                                 return $ TupRsingle buffer
 -- toBuffers (TupRpair v1 v2) = do buffers1 <- toBuffers v1
 --                                 buffers2 <- toBuffers v2
 --                                 return (TupRpair buffers1 buffers2)
 
--- toBuffer :: ScalarType a -> TensorValue a -> IO (TensorBuffer a)
--- toBuffer st (TScalar _ _) = error "impossible"
--- toBuffer st (TTensor _ ref)
+-- toBuffer :: TensorValue a -> IO (Buffer (ElemType a))
+-- toBuffer (TScalar _ _) = error "impossible"
+-- toBuffer (TTensor st _ ref)
 --   = do
 --     value <- readIORef ref
 --     case value of
@@ -284,10 +307,10 @@ mapTail _ []     = []
 --         let n = S.length vec
 --         mutableBuffer <- newBuffer st n
 --         writeVectorToBuffer st vec mutableBuffer
---         return $ TensorBuffer st n $ unsafeFreezeBuffer mutableBuffer
+--         return $ unsafeFreezeBuffer mutableBuffer
 
--- writeVectorToBuffer :: ScalarType a -> S.Vector a -> MutableBuffer a -> IO ()
--- writeVectorToBuffer st vec buffer = S.iforM_ vec (writeBuffer st buffer)
+writeVectorToBuffer :: S.Storable a => ScalarType a -> S.Vector a -> MutableBuffer a -> IO ()
+writeVectorToBuffer st vec buffer = S.iforM_ vec (writeBuffer st buffer)
 
 runTensorValues :: TensorValues t -> IO ()
 runTensorValues TupRunit         = return ()
