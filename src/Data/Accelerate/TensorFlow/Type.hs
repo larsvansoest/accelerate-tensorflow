@@ -61,23 +61,78 @@ import Data.Kind
 import Data.Proxy
 import Data.Type.Bool (If)
 
-type TFAdd = '[Data.Complex.Complex Double,
+type TFAll = '[Data.Complex.Complex Double,
                Data.Complex.Complex Float,
-               Data.ByteString.ByteString, 
+               Bool,
                Data.Int.Int16,
-               Data.Int.Int32, 
+               Data.Int.Int32,
                Data.Int.Int64,
-               Data.Int.Int8, 
+               Data.Int.Int8,
                Data.Word.Word16,
-               Data.Word.Word8, 
-               Double, 
+               Data.Word.Word32,
+               Data.Word.Word64,
+               Data.Word.Word8,
+               Double,
                Float]
+
+type TFNum = TFAll TF.\\ '[Bool]
+
+type TFNeg = TFNum TF.\\ '[Data.Word.Word8]
+type TFSign = TFNeg
+
+type TFAbs = TFNum TF.\\ '[Data.Word.Word8, Data.Complex.Complex Double, Data.Complex.Complex Float]
 
 data TensorDict types t where
   TensorDict :: TF.OneOf types t => TensorDict types t
 
 data TensorTypeDict a where
   TensorTypeDict :: (S.Storable a, TF.TensorDataType S.Vector a, TF.TensorType a) => TensorTypeDict a
+
+tfAllDict :: ScalarType a -> TensorDict TFAll a
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = error "not a TF all type"
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt8)))   = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt16)))  = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt32)))  = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt64)))  = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeWord)))   = error "not a TF all type"
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeWord8)))  = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeWord16))) = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeWord32))) = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeWord64))) = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   = error "not a TF all type"
+tfAllDict (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  = TensorDict
+tfAllDict (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) = TensorDict
+tfAllDict (VectorScalarType _)                                            = error "not a TF all type"
+
+tfNumDict :: NumType a -> TensorDict TFNum a
+tfNumDict (IntegralNumType TypeInt)    = error "not a TF num type"
+tfNumDict (IntegralNumType TypeInt8)   = TensorDict
+tfNumDict (IntegralNumType TypeInt16)  = TensorDict
+tfNumDict (IntegralNumType TypeInt32)  = TensorDict
+tfNumDict (IntegralNumType TypeInt64)  = TensorDict
+tfNumDict (IntegralNumType TypeWord)   = error "not a TF num type"
+tfNumDict (IntegralNumType TypeWord8)  = TensorDict
+tfNumDict (IntegralNumType TypeWord16) = TensorDict
+tfNumDict (IntegralNumType TypeWord32) = TensorDict
+tfNumDict (IntegralNumType TypeWord64) = TensorDict
+tfNumDict (FloatingNumType TypeHalf)   = error "not a TF num type"
+tfNumDict (FloatingNumType TypeFloat)  = TensorDict
+tfNumDict (FloatingNumType TypeDouble) = TensorDict
+
+tfNegDict :: NumType a -> TensorDict TFNeg a
+tfNegDict (IntegralNumType TypeWord8)  = error "not a TF neg type"
+tfNegDict (IntegralNumType TypeInt)    = error "not a TF neg type"
+tfNegDict (IntegralNumType TypeInt8)   = TensorDict
+tfNegDict (IntegralNumType TypeInt16)  = TensorDict
+tfNegDict (IntegralNumType TypeInt32)  = TensorDict
+tfNegDict (IntegralNumType TypeInt64)  = TensorDict
+tfNegDict (IntegralNumType TypeWord)   = error "not a TF neg type"
+tfNegDict (IntegralNumType TypeWord16) = TensorDict
+tfNegDict (IntegralNumType TypeWord32) = TensorDict
+tfNegDict (IntegralNumType TypeWord64) = TensorDict
+tfNegDict (FloatingNumType TypeHalf)   = error "not a TF neg type"
+tfNegDict (FloatingNumType TypeFloat)  = TensorDict
+tfNegDict (FloatingNumType TypeDouble) = TensorDict
 
 tensorTypeDict :: ScalarType a -> TensorTypeDict a
 tensorTypeDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = error "not a tensortype"

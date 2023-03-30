@@ -6,7 +6,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
+
 
 module Data.Accelerate.TensorFlow.Kernel where
 
@@ -16,7 +16,6 @@ import Data.Array.Accelerate.AST.Kernel (NoKernelMetadata)
 import Data.Text.Prettyprint.Doc
 import Data.Array.Accelerate.Pretty.Exp
     ( prettyConst, primOperator, prettyLhs )
-import Data.Array.Accelerate.Pretty.Print (Operator(..))
 import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Smart (typeR, undef)
@@ -41,12 +40,16 @@ import Data.Array.Accelerate.Pretty.Print
 import Data.Accelerate.TensorFlow.Type
 
 data TensorKernel env where
-  TensorConstant :: s -> BaseVar env (Buffer s) -> TensorKernel env
-  TensorAdd :: TensorDict TFAdd a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
-  -- PrimDivMod   :: IntegralType a -> PrimFun ((a, a)   -> (a, a)) twee resultaten, daarom meervoud
-  -- er zijn methodes om scalartypes van args of resultaat geven 'primfunType'
-  TensorId :: BaseVar env (Buffer s) -> BaseVar env (Buffer s) -> TensorKernel env
-  -- waarom expVars bij sommigen en bij andere expVar?
+  TensorConstant :: TensorDict TFAll s -> s -> BaseVar env (Buffer s) -> TensorKernel env
+  TensorId :: TensorDict TFAll a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorAdd :: TensorDict TFNum a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorMul :: TensorDict TFNum a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorSub :: TensorDict TFNum a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorNeg :: TensorDict TFNeg a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorAbs :: TensorDict TFAbs a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorSign :: TensorDict TFSign a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+
+  TensorTruncateDiv :: TensorDict TFNum a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
 
 instance NFData' TensorKernel where
   rnf' !_  = ()
@@ -73,24 +76,38 @@ wildcards (LeftHandSidePair lhs lhs')
 wildcards _                           = Nothing
 
 instance PrettyKernel TensorKernel where
-  prettyKernel = PrettyKernelBody True prettyKernel'
-
-prettyKernel' :: Val env -> TensorKernel env -> Adoc
-prettyKernel' _ (TensorAdd _ _ _ _)            = vsep [ "TensorAdd "]
-prettyKernel' _ (TensorConstant s var)  = vsep [ "TensorConstant" ]
-prettyKernel' _ (TensorId var var')     = vsep [ "TensorId" ]
+  prettyKernel = PrettyKernelBody True $ \_ _ -> ""
 
 compileOperation :: TensorOp args -> Args env args -> TensorKernel env
-compileOperation (TConstant (t :: ScalarType e) s) (ArgArray _ (ArrayR _ a) _ gvb :>: _)
-  | Refl <- reprIsSingle @ScalarType @e @Buffer t
-  = TensorConstant s (groundToBase a gvb)
-compileOperation (TId (t :: ScalarType e)) (ArgArray _ (ArrayR _ a) _ gvbIn :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _)
-  | Refl <- reprIsSingle @ScalarType @e @Buffer t
-  = TensorId (groundToBase a gvbIn) (groundToBase b gvbOut)
-compileOperation (TAdd TensorDict (stIn :: ScalarType a)) (ArgArray _ (ArrayR _ (TupRpair a a')) _ (TupRpair gvbIn gvbIn') :>: ArgArray _ (ArrayR _ b) _ gvbOut :>: _)
+compileOperation (TConstant dict stIn s) (argIn :>: _)      = compileNullaryOperation1 dict stIn argIn (`TensorConstant` s)
+compileOperation (TId dict stIn) (argIn :>: argOut :>: _)   = compileUnaryOperation1 dict stIn stIn argIn argOut TensorId
+ 
+compileOperation (TAdd dict stIn) (argIn :>: argOut :>: _)  = compileBinaryOperation1 dict stIn stIn argIn argOut TensorAdd
+compileOperation (TMul dict stIn) (argIn :>: argOut :>: _)  = compileBinaryOperation1 dict stIn stIn argIn argOut TensorMul
+compileOperation (TSub dict stIn) (argIn :>: argOut :>: _)  = compileBinaryOperation1 dict stIn stIn argIn argOut TensorSub
+compileOperation (TNeg dict stIn) (argIn :>: argOut :>: _)  = compileUnaryOperation1 dict stIn stIn argIn argOut TensorNeg
+compileOperation (TAbs dict stIn) (argIn :>: argOut :>: _)  = compileUnaryOperation1 dict stIn stIn argIn argOut TensorAbs
+compileOperation (TSign dict stIn) (argIn :>: argOut :>: _) = compileUnaryOperation1 dict stIn stIn argIn argOut TensorSign
+compileOperation (TTruncateDiv dict stIn) (argIn :>: argOut :>: _) = compileBinaryOperation1 dict stIn stIn argIn argOut TensorTruncateDiv
+compileOperation _ _ = undefined
+
+compileNullaryOperation1 :: forall types a sh env. TensorDict types a -> ScalarType a -> Arg env (Out sh a) -> (TensorDict types a -> BaseVar env (Buffer a) -> TensorKernel env) -> TensorKernel env
+compileNullaryOperation1 TensorDict stOut (ArgArray _ (ArrayR _ a) _ gvbOut) kernel
+ | Refl <- reprIsSingle @ScalarType @a @Buffer stOut
+ = kernel TensorDict (groundToBase a gvbOut)
+
+compileBinaryOperation1 :: forall types a b sh env. TensorDict types a -> ScalarType a -> ScalarType b -> Arg env (In sh (a, a)) -> Arg env (Out sh b) -> (TensorDict types a -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer b) -> TensorKernel env) -> TensorKernel env
+compileBinaryOperation1 TensorDict stIn stOut (ArgArray _ (ArrayR _ (TupRpair a a')) _ (TupRpair gvbIn gvbIn')) (ArgArray _ (ArrayR _ b) _ gvbOut) kernel
+ | Refl <- reprIsSingle @ScalarType @a @Buffer stIn
+ , Refl <- reprIsSingle @ScalarType @b @Buffer stOut
+ = kernel TensorDict (groundToBase a gvbIn) (groundToBase a' gvbIn') (groundToBase b gvbOut)
+compileBinaryOperation1 _ _ _ _ _ _ = error "impossible"
+
+compileUnaryOperation1 :: forall types a b sh env. TensorDict types a -> ScalarType a -> ScalarType b -> Arg env (In sh a) -> Arg env (Out sh b) -> (TensorDict types a -> BaseVar env (Buffer a) -> BaseVar env (Buffer b) -> TensorKernel env) -> TensorKernel env
+compileUnaryOperation1 TensorDict stIn stOut (ArgArray _ (ArrayR _ a) _ gvbIn) (ArgArray _ (ArrayR _ b) _ gvbOut) kernel
   | Refl <- reprIsSingle @ScalarType @a @Buffer stIn
-  = TensorAdd TensorDict (groundToBase a gvbIn) (groundToBase a' gvbIn') (groundToBase b gvbOut)
-compileOperation _ _ = internalError "Operation not yet supported by kernel"
+  , Refl <- reprIsSingle @ScalarType @b @Buffer stOut
+  = kernel TensorDict (groundToBase a gvbIn) (groundToBase b gvbOut)
 
 groundToBase :: TypeR a -> GroundVars env (Buffer a) -> BaseVar env (Buffer a)
 groundToBase _ (TupRsingle (Var groundR idx)) = Var (BaseRground groundR) idx
