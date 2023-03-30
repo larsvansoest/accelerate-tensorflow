@@ -11,6 +11,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use record patterns" #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -45,9 +46,22 @@ import Data.Array.Accelerate.Trafo.Partitioning.ILP.Solver
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
 import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ)
 
-data TensorOp op where
+import qualified TensorFlow.Ops                                     as TF
+import qualified TensorFlow.Core                                    as TF
+import qualified TensorFlow.Tensor                                  as TF
+import qualified TensorFlow.Types                                   as TF
+import qualified TensorFlow.Session                                 as TF
+import Data.Vector (Vector)
+import qualified TensorFlow.GenOps.Core                             as TF hiding (shape, placeholder)
+import Data.Accelerate.TensorFlow.Type
+import Data.Array.Accelerate (exp)
+
+-- data TensorPrimFun sig where
+--   TFAdd :: TFAddT a => TensorPrimFun ((a, a) -> a)
+
+data TensorOp op where -- evidence opslaan
   TConstant :: ScalarType s -> s -> TensorOp (Out sh s -> ())
-  TPrimFun :: PrimFun (a -> b) -> TensorOp (In sh a -> Out sh b -> ())
+  TAdd :: TensorDict TFAdd a -> ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
   TId :: ScalarType s -> TensorOp (In sh s -> Out sh s -> ())
   TWhere :: ScalarType s -> TensorOp (In sh s -> Out DIM1 sh -> ())
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
@@ -56,12 +70,12 @@ data TensorOp op where
 
 instance PrettyOp TensorOp where
   prettyOp (TConstant s e)    = vsep ["TConst", prettyConst (TupRsingle s) e]
-  prettyOp (TPrimFun f)       = vsep ["TBinOp", opName (primOperator f) ]
   prettyOp (TId s)            = vsep ["TId", prettyScalarType s]
   prettyOp (TWhere s)         = vsep ["TWhere", prettyScalarType s]
   prettyOp (TTensorScatter f) = vsep ["TTensorScatter", viaShow f]
   prettyOp (TBooleanMask s)   = vsep ["TBooleanMask", prettyScalarType s]
   prettyOp TSelect            = vsep ["TSelect"]
+  prettyOp _ = vsep ["pretty me!"]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
@@ -189,23 +203,28 @@ mkMapF :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env
   -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
 mkMapF _ (Const s e) aOut = Exec (TConstant s e) $ aOut :>: ArgsNil
 
-mkMapF env (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh _) gv _)
- | a <- expType exp
- , DeclareVars lhs w k <- declareVars $ buffersR a
- = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
-   Alet (LeftHandSideWildcard TupRunit) TupRunit
-   (mkMapF -- flatten higher-order expression
-     (weakenEnv w env)
-     (weakenArrayInstr w exp)
-     (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
-   ) $
-   Exec -- apply method to the result
-    (TPrimFun f)
-    (
-      ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>:
-      weaken w aOut :>:
-      ArgsNil
-    )
+mkMapF env (PrimApp f exp) aOut = mkMapPrimAppF env f exp aOut
+
+-- mkMapF env (PrimApp f exp) aOut@(ArgArray _ (ArrayR sh t) gv _)
+--  | a <- expType exp
+--  , DeclareVars lhs w k <- declareVars $ buffersR a
+--  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
+--    Alet (LeftHandSideWildcard TupRunit) TupRunit
+--    (mkMapF -- flatten higher-order expression
+--      (weakenEnv w env)
+--      (weakenArrayInstr w exp)
+--      (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
+--    ) $
+--    Exec -- apply method to the result
+--     (tpf)
+--     (
+--       ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>:
+--       weaken w aOut :>:
+--       ArgsNil
+--     )
+--   where tpf = case f of
+--           PrimAdd _ -> TAdd
+--           _         -> undefined
 
 mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp1
@@ -282,6 +301,44 @@ mkMapF _ (PrimConst _) _ = undefined
 mkMapF _ (Undef _) _ = undefined
 mkMapF _ (Coerce _ _ _) _ = undefined
 mkMapF _ _ _ = error "impossible"
+
+mkMapPrimAppF :: BufferEnv env env' -> PrimFun (a -> t) -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+mkMapPrimAppF env f@(PrimAdd nt) exp aOut = case nt of
+  IntegralNumType it -> case it of
+    TypeInt -> error "type not supported"
+    TypeInt8 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeInt16 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeInt32 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeInt64 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeWord -> error "type not supported"
+    TypeWord8 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeWord16 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeWord32 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeWord64 -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+  FloatingNumType ft -> case ft of
+    TypeHalf -> error "type not supported"
+    TypeFloat -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+    TypeDouble -> mkMapPrimAppF' env exp aOut $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
+mkMapPrimAppF env _ exp aOut = undefined
+
+mkMapPrimAppF' :: BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh b) -> TensorOp (In sh a -> Out sh b -> ()) -> OperationAcc TensorOp env ()
+mkMapPrimAppF' env exp aOut@(ArgArray _ (ArrayR sh t) gv _) op
+ | a <- expType exp
+ , DeclareVars lhs w k <- declareVars $ buffersR a
+ = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
+   Alet (LeftHandSideWildcard TupRunit) TupRunit
+   (mkMapF -- flatten higher-order expression
+     (weakenEnv w env)
+     (weakenArrayInstr w exp)
+     (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
+   ) $
+   Exec -- apply method to the result
+    op
+    (
+      ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>:
+      weaken w aOut :>:
+      ArgsNil
+    )
 
 shapeSize :: ShapeR sh -> ExpVars env' sh -> PreOpenExp (ArrayInstr env) env' Int
 shapeSize ShapeRz TupRunit                                = Const scalarTypeInt 1
