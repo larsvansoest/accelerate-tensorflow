@@ -14,6 +14,9 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
 
@@ -59,8 +62,26 @@ import Data.Array.Accelerate.Representation.Elt (showElt)
 import Data.Data (Proxy)
 import Data.Proxy (Proxy(..))
 import Data.Array.Accelerate.AST.Idx
+import Data.Array.Accelerate.AST.Schedule
+import Data.Array.Accelerate.AST.Schedule.Uniform (inputR)
 
 -- detect copy implementeren voor het versimpelen voor programma's
+
+-- instance Execute SequentialSchedule TensorKernel where
+--   executeAfunSchedule :: GFunctionR t -> SequentialSchedule TensorKernel () (Scheduled SequentialSchedule t) -> IOFun (Scheduled SequentialSchedule t)
+--   executeAfunSchedule gFun sched = runTensorElementsIOFun gFun $ executeSequentialSchedule Empty sched
+
+-- runTensorElementsIOFun :: forall t. GFunctionR t 
+--   -> TensorElementsIOFun (Scheduled SequentialSchedule t)
+--   -> IOFun (Scheduled SequentialSchedule t)
+-- runTensorElementsIOFun (GFunctionRlam gr gFun) f = \arg -> runTensorElementsIOFun gFun $ f (input gr arg)
+--   where input :: GroundsR t -> t -> TupR TensorElement t
+--         input (TupRsingle (GroundRscalar st)) s = TupRsingle $ Scalar (TupRsingle st) s 
+--         input _ _ = error "impossible"
+-- runTensorElementsIOFun (GFunctionRbody gr) f
+--   | Refl <- reprIsBody @SequentialSchedule gr = \arg -> _
+-- Vrijdag: help with the above
+-- Vrijdag: test library opzetten
 
 type TensorEnv = Env TensorElement
 
@@ -160,8 +181,6 @@ executeUnaryKernel1 env inIdx outIdx tfOp
     liftIO $ writeIORef outRef $ Build $ tfOp inTensor
     return TupRunit
 executeUnaryKernel1 _ _ _ _ = error "impossible"
-
-z = TF.where' _ _
 
 executeBinaryKernel1 :: TensorEnv env -> Idx env (Buffer a) -> Idx env (Buffer a) -> Idx env (Buffer b) -> (TF.Tensor TF.Build a -> TF.Tensor TF.Build a -> TF.Tensor TF.Build b) -> TF.Session (TensorElements ())
 executeBinaryKernel1 env inIdx1 inIdx2 outIdx tfOp
