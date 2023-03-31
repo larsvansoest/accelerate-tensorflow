@@ -12,6 +12,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use record patterns" #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
@@ -44,37 +45,59 @@ import Data.Array.Accelerate.Trafo.Partitioning.ILP.Labels (LabelledArg(..))
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph (LabelledArgOp(..))
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Solver
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
-import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ)
+import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarType, encodeScalarConst)
 
 import Data.Accelerate.TensorFlow.Type
 import Proto.Tensorflow.Core.Util.TestLog (TestResults'BenchmarkType(TestResults'BenchmarkType'Unrecognized))
+import qualified TensorFlow.Types as TF
+import Data.ByteString.Builder (Builder)
 
 data TensorOp op where
-  TConstant :: TensorDict TFAll a -> ScalarType a -> a -> TensorOp (Out sh a -> ())
-  TId :: TensorDict TFAll a -> ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
+  TConstant :: TF.OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())
+  TId :: TF.OneOf TFAll a => ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
 
-  TAdd :: TensorDict TFNum a -> ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
-  TMul :: TensorDict TFNum a -> ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
-  TSub :: TensorDict TFNum a -> ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
-  TNeg :: TensorDict TFNeg a -> ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
-  TAbs :: TensorDict TFAbs a -> ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
-  TSign :: TensorDict TFSign a -> ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
+  TAdd :: TF.OneOf TFNum a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
+  TMul :: TF.OneOf TFNum a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
+  TSub :: TF.OneOf TFNum a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
+  TNeg :: TF.OneOf TFNeg a => ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
+  TAbs :: TF.OneOf TFAbs a => ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
+  TSign :: TF.OneOf TFSign a => ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
 
-  TTruncateDiv :: TensorDict TFNum a -> ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
+  TTruncateDiv :: TF.OneOf TFNum a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
+  TTruncateMod :: TF.OneOf TFTruncateMod a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
 
   TWhere :: ScalarType a -> TensorOp (In sh a -> Out DIM1 sh -> ())
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
   TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
   TSelect :: TensorOp (In sh Bool -> In sh t -> In sh t -> Out sh t -> ())
 
+instance EncodeOperation TensorOp where
+  encodeOperation :: TensorOp t -> Builder
+  encodeOperation t = case t of
+    TConstant st s -> intHost $(hashQ ("Constant" :: String)) <> encodeScalarConst st s
+    TId st -> intHost $(hashQ ("Id" :: String)) <> encodeScalarType st
+    TAdd st -> intHost $(hashQ ("Add" :: String)) <> encodeScalarType st
+    TMul st -> intHost $(hashQ ("Mul" :: String)) <> encodeScalarType st
+    TSub st -> intHost $(hashQ ("Sub" :: String)) <> encodeScalarType st
+    TNeg st -> intHost $(hashQ ("Neg" :: String)) <> encodeScalarType st
+    TAbs st -> intHost $(hashQ ("Abs" :: String)) <> encodeScalarType st
+    TSign st -> intHost $(hashQ ("Sign" :: String)) <> encodeScalarType st
+    TTruncateDiv st -> intHost $(hashQ ("TruncateDiv" :: String)) <> encodeScalarType st
+    TTruncateMod st -> intHost $(hashQ ("TruncateMod" :: String)) <> encodeScalarType st
+    TWhere st -> intHost $(hashQ ("Where" :: String)) <> encodeScalarType st
+    TTensorScatter sf -> encodeScatterFun sf
+    TBooleanMask st -> intHost $(hashQ ("BooleanMask" :: String)) <> encodeScalarType st
+    TSelect -> intHost $(hashQ ("Select" :: String))
+
 instance PrettyOp TensorOp where
-  prettyOp (TConstant _ s e)    = vsep ["TConst", prettyConst (TupRsingle s) e]
-  prettyOp (TId _ s)          = vsep ["TId", prettyScalarType s]
+  prettyOp :: TensorOp t -> Adoc
+  prettyOp (TConstant s e)    = vsep ["TConst", prettyConst (TupRsingle s) e]
+  prettyOp (TId s)            = vsep ["TId", prettyScalarType s]
   prettyOp (TWhere s)         = vsep ["TWhere", prettyScalarType s]
   prettyOp (TTensorScatter f) = vsep ["TTensorScatter", viaShow f]
   prettyOp (TBooleanMask s)   = vsep ["TBooleanMask", prettyScalarType s]
   prettyOp TSelect            = vsep ["TSelect"]
-  prettyOp _ = vsep ["pretty me!"]
+  prettyOp _                  = vsep ["pretty me!"]
 
 instance NFData' TensorOp where
   rnf' !_ = ()
@@ -84,32 +107,33 @@ instance DesugarAcc TensorOp where
     mkMapF (push' Empty (lhs, distributeBIdx t gvb)) body aOut
   mkMap _ _ _ = error "impossible"
 
-  mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb)
-    | DeclareVars lhs w k       <- declareVars $ buffersR (TupRsingle scalarTypeInt)
-    , DeclareVars lhs' w' k'    <- declareVars $ buffersR (shapeType sh)
-    , DeclareVars lhs'' w'' k'' <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
-    = -- 1) Create a Tensor of shape sh with only ones
-      aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds gv)) $
-      Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (Exec
-        (TConstant (tfAllDict scalarTypeInt) scalarTypeInt 1)
-        (ArgArray Out (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars w gv) (k weakenId) :>: ArgsNil)
-      ) $
-      -- 2) Obtain a 1D array of indexes (tf.where returns list of indices pointing to values > 0)
-      aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (weakenVars w $ fromGrounds gv)) $
-      aletUnique lhs'' (Compute (ShapeSize sh (paramsIn' $ weakenVars (w' .> w) $ fromGrounds gv))) $
-      Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (Exec
-        (TWhere scalarTypeInt)
-        (ArgArray In (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w'' .> w' .> w) gv) (k (w'' .> w')) :>:
-         ArgArray Out (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w'') :>:
-         ArgsNil)
-      )
-      -- 3) Apply map on array of indices.
-      (mkMap
-        (weaken (w'' .> w' .> w) f)
-        (ArgArray In (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w''))
-        (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k'' weakenId)) (weakenVars (w'' .> w' .> w) gvb)))
+  mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb) = undefined
+  -- mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb)
+  --   | DeclareVars lhs w k       <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+  --   , DeclareVars lhs' w' k'    <- declareVars $ buffersR (shapeType sh)
+  --   , DeclareVars lhs'' w'' k'' <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+  --   = -- 1) Create a Tensor of shape sh with only ones
+  --     aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds gv)) $
+  --     Alet (LeftHandSideWildcard TupRunit) TupRunit
+  --     (Exec
+  --       (TConstant scalarTypeInt 1)
+  --       (ArgArray Out (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars w gv) (k weakenId) :>: ArgsNil)
+  --     ) $
+  --     -- 2) Obtain a 1D array of indexes (tf.where returns list of indices pointing to values > 0)
+  --     aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (weakenVars w $ fromGrounds gv)) $
+  --     aletUnique lhs'' (Compute (ShapeSize sh (paramsIn' $ weakenVars (w' .> w) $ fromGrounds gv))) $
+  --     Alet (LeftHandSideWildcard TupRunit) TupRunit
+  --     (Exec
+  --       (TWhere scalarTypeInt)
+  --       (ArgArray In (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w'' .> w' .> w) gv) (k (w'' .> w')) :>:
+  --        ArgArray Out (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w'') :>:
+  --        ArgsNil)
+  --     )
+  --     -- 3) Apply map on array of indices.
+  --     (mkMap
+  --       (weaken (w'' .> w' .> w) f)
+  --       (ArgArray In (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w''))
+  --       (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k'' weakenId)) (weakenVars (w'' .> w' .> w) gvb)))
 
   mkPermute
     (ArgFun comb)
@@ -200,7 +224,7 @@ fromJust _ _ = error "impossible"
 
 mkMapF :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' t
   -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
-mkMapF _ (Const s e) aOut = Exec (TConstant (tfAllDict s) s e) $ aOut :>: ArgsNil
+mkMapF _ (Const s e) aOut | TensorDict <- tfAllDict s = Exec (TConstant s e) $ aOut :>: ArgsNil
 
 mkMapF env (PrimApp f exp) aOut = mkMapPrimAppF f env exp aOut
 
@@ -221,10 +245,11 @@ mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
 
 mkMapF env (Evar (Var s idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR _)))
   | Refl <- reprIsSingle @ScalarType @t @Buffer s
+  , TensorDict <- tfAllDict s
   = let (BIdx idx') = prj' idx env
         gvb'        = TupRsingle (Var groundR idx')
     in  Exec
-          (TId (tfAllDict s) s)
+          (TId s)
           (
             ArgArray In arrayR gv gvb' :>:
             ArgArray Out arrayR gv gvb :>:
@@ -274,19 +299,20 @@ mkMapF _ (Coerce _ _ _) _ = undefined
 mkMapF _ _ _ = error "impossible"
 
 mkMapPrimAppF :: PrimFun (a -> t) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
-mkMapPrimAppF (PrimAdd nt)  | TensorDict <- tfNumDict nt = mkMapPrimAppF' $ TAdd TensorDict (SingleScalarType (NumSingleType nt))
-mkMapPrimAppF (PrimMul nt)  | TensorDict <- tfNumDict nt = mkMapPrimAppF' $ TMul TensorDict (SingleScalarType (NumSingleType nt))
-mkMapPrimAppF (PrimSub nt)  | TensorDict <- tfNumDict nt = mkMapPrimAppF' $ TSub TensorDict (SingleScalarType (NumSingleType nt))
-mkMapPrimAppF (PrimNeg nt)  | TensorDict <- tfNegDict nt = mkMapPrimAppF' $ TNeg TensorDict (SingleScalarType (NumSingleType nt))
-mkMapPrimAppF (PrimAbs nt)  | TensorDict <- tfNegDict nt = mkMapPrimAppF' $ TAbs TensorDict (SingleScalarType (NumSingleType nt))
-mkMapPrimAppF (PrimSig nt)  | TensorDict <- tfNegDict nt = mkMapPrimAppF' $ TSign TensorDict (SingleScalarType (NumSingleType nt))
+mkMapPrimAppF (PrimAdd nt)  | TensorDict <- tfNumDict nt = mkMapPrimAppF' $ TAdd (SingleScalarType (NumSingleType nt))
+mkMapPrimAppF (PrimMul nt)  | TensorDict <- tfNumDict nt = mkMapPrimAppF' $ TMul (SingleScalarType (NumSingleType nt))
+mkMapPrimAppF (PrimSub nt)  | TensorDict <- tfNumDict nt = mkMapPrimAppF' $ TSub (SingleScalarType (NumSingleType nt))
+mkMapPrimAppF (PrimNeg nt)  | TensorDict <- tfNegDict nt = mkMapPrimAppF' $ TNeg (SingleScalarType (NumSingleType nt))
+mkMapPrimAppF (PrimAbs nt)  | TensorDict <- tfNegDict nt = mkMapPrimAppF' $ TAbs (SingleScalarType (NumSingleType nt))
+mkMapPrimAppF (PrimSig nt)  | TensorDict <- tfNegDict nt = mkMapPrimAppF' $ TSign (SingleScalarType (NumSingleType nt))
 
-mkMapPrimAppF (PrimQuot it) | TensorDict <- tfNumDict (IntegralNumType it) = mkMapPrimAppF' $ TTruncateDiv TensorDict (SingleScalarType (NumSingleType (IntegralNumType it)))
+mkMapPrimAppF (PrimQuot it) | TensorDict <- tfNumDict (IntegralNumType it) = mkMapPrimAppF' $ TTruncateDiv (SingleScalarType (NumSingleType (IntegralNumType it)))
+mkMapPrimAppF (PrimRem it)  | TensorDict <- tfTruncateModDict (IntegralNumType it) = mkMapPrimAppF' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
 
 mkMapPrimAppF _ = undefined
 
 mkMapPrimAppF' :: TensorOp (In sh a -> Out sh b -> ()) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh b) -> OperationAcc TensorOp env ()
-mkMapPrimAppF' op env exp aOut@(ArgArray _ (ArrayR sh t) gv _)
+mkMapPrimAppF' op env exp aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp
  , DeclareVars lhs w k <- declareVars $ buffersR a
  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
@@ -351,7 +377,6 @@ type BufferEnv benv env = Env (BufferIdx benv) env
 weakenEnv :: Sink f => (env1 :> env') -> Env (f env1) env2 -> Env (f env') env2
 weakenEnv w = mapEnv (weaken w)
 
--- forall is alleen nodig als je @s wilt gebruiken in de method definition
 distributeBIdx :: forall env s. TypeR s -> GroundVars env (Buffers s) -> Distribute (BufferIdx env) s
 distributeBIdx TupRunit _ = ()
 distributeBIdx (TupRsingle s) (TupRsingle (Var _ idx))
@@ -365,6 +390,10 @@ data ScatterFun where
   ScatterFunAdd :: ScatterFun
   ScatterFunMin :: ScatterFun
   deriving Show
+
+encodeScatterFun :: ScatterFun -> Builder
+encodeScatterFun ScatterFunAdd = intHost $(hashQ ("ScatterFunAdd" :: String))
+encodeScatterFun ScatterFunMin = intHost $(hashQ ("ScatterFunMin" :: String))
 
 prettyScatterFun :: ScatterFun -> Adoc
 prettyScatterFun ScatterFunAdd = "ScatterFunAdd"

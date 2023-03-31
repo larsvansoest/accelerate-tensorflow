@@ -22,6 +22,7 @@ import Control.Monad.IO.Class
 import Control.Concurrent
 import Data.Array.Accelerate.Array.Buffer
 import GHC.MVar
+import Data.Array.Accelerate.Interpreter
 
 type Tensor = TF.Tensor TF.Build
 
@@ -36,7 +37,12 @@ main = do putStrLn try
           let sched = convertAfun @SequentialSchedule @TensorKernel $ map @DIM1 @Int64 (\x -> (x + 1) * 2 - (abs (-6))) (use (fromList (Z :. 10) [0..]))
           putStrLn $ renderForTerminal $ prettySchedule sched
           let inputTensorValues = undefined :: TensorElements (MVar (((), Int), Buffer Int64))
-          executeSequentialSchedule Empty sched inputTensorValues
+          let x = run @TensorFlow $ map @DIM1 @Int64 (\x -> (x + 1) * 2 - (abs (-6))) (use (fromList (Z :. 10) [0..]))
+          --let x' = run @Interpreter $ map @DIM1 @Int64 (\x -> (x + 1) * 2 - (abs (-6))) (use (fromList (Z :. 10) [0..]))
+          putStrLn $ show x
+          --putStrLn $ show x' -- errors, perhaps use gerobi
+          return ()
+          -- executeSequentialSchedule Empty sched inputTensorValues
 
 -- try = test @UniformScheduleFun @TensorKernel $ x
 -- try = let zeros :: Acc (Matrix Int) 

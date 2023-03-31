@@ -80,13 +80,21 @@ type TFNum = TFAll TF.\\ '[Bool]
 type TFNeg = TFNum TF.\\ '[Data.Word.Word8]
 type TFSign = TFNeg
 
+type TFTruncateMod = '[Data.Int.Int32, 
+                       Data.Int.Int64,
+                       Data.Word.Word16, 
+                       Double,
+                       Float]
+
 type TFAbs = TFNum TF.\\ '[Data.Word.Word8, Data.Complex.Complex Double, Data.Complex.Complex Float]
 
 data TensorDict types t where
   TensorDict :: TF.OneOf types t => TensorDict types t
 
+type TensorType a = (S.Storable a, TF.TensorDataType S.Vector a, TF.TensorType a)
+
 data TensorTypeDict a where
-  TensorTypeDict :: (S.Storable a, TF.TensorDataType S.Vector a, TF.TensorType a) => TensorTypeDict a
+  TensorTypeDict :: TensorType a => TensorTypeDict a
 
 tfAllDict :: ScalarType a -> TensorDict TFAll a
 tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = error "not a TF all type"
@@ -133,6 +141,21 @@ tfNegDict (IntegralNumType TypeWord64) = TensorDict
 tfNegDict (FloatingNumType TypeHalf)   = error "not a TF neg type"
 tfNegDict (FloatingNumType TypeFloat)  = TensorDict
 tfNegDict (FloatingNumType TypeDouble) = TensorDict
+
+tfTruncateModDict :: NumType a -> TensorDict TFTruncateMod a
+tfTruncateModDict (IntegralNumType TypeWord8)   = error "not a TF truncate mod type"
+tfTruncateModDict (IntegralNumType TypeInt)     = error "not a TF truncate mod type"
+tfTruncateModDict (IntegralNumType TypeInt8)    = error "not a TF truncate mod type"
+tfTruncateModDict (IntegralNumType TypeInt16)   = error "not a TF truncate mod type"
+tfTruncateModDict (IntegralNumType TypeInt32)   = TensorDict
+tfTruncateModDict (IntegralNumType TypeInt64)   = TensorDict
+tfTruncateModDict (IntegralNumType TypeWord)    = error  "not a TF truncate mod type"
+tfTruncateModDict (IntegralNumType TypeWord16)  = TensorDict
+tfTruncateModDict (IntegralNumType TypeWord32)  = TensorDict
+tfTruncateModDict (IntegralNumType TypeWord64)  = TensorDict
+tfTruncateModDict (FloatingNumType TypeHalf)    = error "not a TF truncate mod type"
+tfTruncateModDict (FloatingNumType TypeFloat)   = TensorDict
+tfTruncateModDict (FloatingNumType TypeDouble)  = TensorDict
 
 tensorTypeDict :: ScalarType a -> TensorTypeDict a
 tensorTypeDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = error "not a tensortype"
