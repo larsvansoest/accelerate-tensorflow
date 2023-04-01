@@ -40,6 +40,10 @@ dependencies:
 - tensorflow-proto
 - vector
 - bytestring
+- tasty
+- tasty-hedgehog
+- tasty-hunit
+- tasty-quickcheck
 
 library:
   source-dirs: src
@@ -89,6 +93,8 @@ tests:
       - hedgehog
       - tasty
       - tasty-hedgehog
+      - tasty-hunit
+      - tasty-quickcheck
     when:
       - condition: flag(llvm-cpu)
         cpp-options: -DACCELERATE_LLVM_NATIVE_BACKEND

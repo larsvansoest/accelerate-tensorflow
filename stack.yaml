@@ -26,6 +26,9 @@ extra-deps:
 - proto-lens-protoc-0.7.1.1
 - proto-lens-runtime-0.7.0.3
 - proto-lens-setup-0.4.0.6
+- tasty-1.4.3
+- tasty-hunit-0.10.0.3
+- tasty-quickcheck-0.10.2
 
 # Override default flag values for local packages and extra-deps
 flags:

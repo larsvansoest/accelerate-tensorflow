@@ -67,6 +67,27 @@ packages:
       size: 235
   original:
     hackage: proto-lens-setup-0.4.0.6
+- completed:
+    hackage: tasty-1.4.3@sha256:5b53fded93109f6704b599c3498eb73c5b0ed1a975f1912dd98b4b19c61f8bc9,2653
+    pantry-tree:
+      sha256: 99e16394d2260ea67187c474521321cef3db4a3e02b9d4efaacebad3cd936dbe
+      size: 1944
+  original:
+    hackage: tasty-1.4.3
+- completed:
+    hackage: tasty-hunit-0.10.0.3@sha256:ba774024f3a26100c559dbef41e030bdf443408ed848691f7b9aa85b6fb218c3,1545
+    pantry-tree:
+      sha256: c82bce9c756f82fa9221fc2f89b8fa52858d630a388b9288af90cb0c03e084de
+      size: 399
+  original:
+    hackage: tasty-hunit-0.10.0.3
+- completed:
+    hackage: tasty-quickcheck-0.10.2@sha256:76bf07f500e258903e9a1df6f19788e0ef75e83f33ebe6b6b14b287418e0b7c1,1629
+    pantry-tree:
+      sha256: cf56f9e6b08abce2e520d4147b0ab15372c8d6e84baaa3590d2943cb6124e247
+      size: 332
+  original:
+    hackage: tasty-quickcheck-0.10.2
 snapshots:
 - completed:
     sha256: ce4fb8d44f3c6c6032060a02e0ebb1bd29937c9a70101c1517b92a87d9515160

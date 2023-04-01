@@ -150,8 +150,14 @@ executeSeqSchedule _ (Use st n buffer)
   ref <- liftIO $ newIORef $ Build build
   return $ TupRsingle $ Tensor st sh ref
 
-executeSeqSchedule _ (Unit var) = undefined
-
+executeSeqSchedule env (Unit (Var st idx)) 
+  | (Scalar _ t) <- prj' idx env
+  , TensorTypeDict <- tensorTypeDict st 
+  = do let sh = TF.Shape [1]
+       ref <- liftIO $ newIORef $ Build $ TF.constant sh [t]
+       return $ TupRsingle $ Tensor st sh ref
+executeSeqSchedule _ (Unit _) = error "impossible"
+       
 executeSeqSchedule _ (Acond var ss ss') = undefined
 
 executeSeqSchedule _ (Awhile tr ssf ssf' tr') = undefined

@@ -108,7 +108,7 @@ instance DesugarAcc TensorOp where
   mkMap _ _ _ = error "impossible"
 
   mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb) = undefined
-  -- mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb)
+  -- mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb) Vraag woensdag: hoe kan ik die type family gebruiken om Int als Int64 te beschouwen?
   --   | DeclareVars lhs w k       <- declareVars $ buffersR (TupRsingle scalarTypeInt)
   --   , DeclareVars lhs' w' k'    <- declareVars $ buffersR (shapeType sh)
   --   , DeclareVars lhs'' w'' k'' <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt

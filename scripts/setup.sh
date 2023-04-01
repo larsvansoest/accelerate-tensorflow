@@ -32,6 +32,7 @@ cp --verbose -r $SCRIPT_DIR/setup-files/tensorflow-haskell/* $SCRIPT_DIR/../extr
 echo "[Setup] Copying configuration files into accelerate submodule"
 cp --verbose $SCRIPT_DIR/../extra-deps/accelerate/stack-8.10.yaml $SCRIPT_DIR/../extra-deps/accelerate/stack.yaml
 cp --verbose $SCRIPT_DIR/setup-files/accelerate/accelerate.cabal $SCRIPT_DIR/../extra-deps/accelerate/accelerate.cabal
+cp --verbose $SCRIPT_DIR/setup-files/accelerate/MIP.hs $SCRIPT_DIR/../extra-deps/accelerate/src/Data/Array/Accelerate/Trafo/Partitioning/ILP/MIP.hs
 
 if [[ $GUROBI == false ]]
 then
