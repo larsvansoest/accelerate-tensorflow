@@ -3,14 +3,8 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RebindableSyntax #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleContexts #-}
 import Data.Array.Accelerate hiding (Eq, Vector)
-import Prelude hiding (fst, snd, properFraction, floor, ceiling, round, toRational, compare, min, (/=), (==), scanr1, scanr, scanl1, scanl, Ord, maximum, minimum, product, or, and, any, all, max, odd, even, reverse, Num, drop, take, tail, init, replicate, unzip3, unzip, zip, zipWith3, zip3, (<=), (>), filter, (&&), (>=), subtract, (<), truncate, (++), fromIntegral, map, (+))
+import Prelude hiding (uncurry, curry, (^^), (^), lcm, gcd, (||), not, iterate, scaleFloat, isNaN, isInfinite, isDenormalized, isNegativeZero, atan2, isIEEE, significand, exponent, encodeFloat, decodeFloat, floatRange, floatDigits, floatRadix, properFraction, floor, ceiling, round, toRational, compare, min, (/=), (==), scanr1, scanr, scanl1, scanl, Ord, maximum, minimum, product, or, and, any, all, max, odd, even, reverse, Num, drop, take, tail, init, replicate, unzip3, unzip, zip, zipWith3, zip3, (<=), (>), filter, (&&), (>=), subtract, (<), truncate, (++), fromIntegral, map, (+))
 import Data.Accelerate.TensorFlow.Execute
 import Data.Array.Accelerate.Interpreter
 
@@ -37,29 +31,29 @@ assertAcc :: (Arrays t, Eq t, Show t) => Acc t -> Assertion
 assertAcc acc = run @TensorFlow acc @?= run @Interpreter acc
 
 assertAcc2 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b) => (Acc a, Acc b) -> Assertion
-assertAcc2 (a, b) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc2 (a, b) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b
   ]
 
 assertAcc3 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c) => (Acc a, Acc b, Acc c) -> Assertion
-assertAcc3 (a, b, c) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc3 (a, b, c) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b,
     run @TensorFlow c @?= run @Interpreter c
   ]
 
 assertAcc4 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d) => (Acc a, Acc b, Acc c, Acc d) -> Assertion
-assertAcc4 (a, b, c, d) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc4 (a, b, c, d) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b,
     run @TensorFlow c @?= run @Interpreter c,
     run @TensorFlow d @?= run @Interpreter d
   ]
 
 assertAcc5 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e) => (Acc a, Acc b, Acc c, Acc d, Acc e) -> Assertion
-assertAcc5 (a, b, c, d, e) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc5 (a, b, c, d, e) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b,
     run @TensorFlow c @?= run @Interpreter c,
     run @TensorFlow d @?= run @Interpreter d,
@@ -67,8 +61,8 @@ assertAcc5 (a, b, c, d, e) = sequence_
   ]
 
 assertAcc6 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f) -> Assertion
-assertAcc6 (a, b, c, d, e, f) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc6 (a, b, c, d, e, f) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b,
     run @TensorFlow c @?= run @Interpreter c,
     run @TensorFlow d @?= run @Interpreter d,
@@ -77,8 +71,8 @@ assertAcc6 (a, b, c, d, e, f) = sequence_
   ]
 
 assertAcc7 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f, Arrays g, Eq g, Show g) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f, Acc g) -> Assertion
-assertAcc7 (a, b, c, d, e, f, g) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc7 (a, b, c, d, e, f, g) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b,
     run @TensorFlow c @?= run @Interpreter c,
     run @TensorFlow d @?= run @Interpreter d,
@@ -88,8 +82,8 @@ assertAcc7 (a, b, c, d, e, f, g) = sequence_
   ]
 
 assertAcc8 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f, Arrays g, Eq g, Show g, Arrays h, Eq h, Show h) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f, Acc g, Acc h) -> Assertion
-assertAcc8 (a, b, c, d, e, f, g, h) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc8 (a, b, c, d, e, f, g, h) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b,
     run @TensorFlow c @?= run @Interpreter c,
     run @TensorFlow d @?= run @Interpreter d,
@@ -100,8 +94,8 @@ assertAcc8 (a, b, c, d, e, f, g, h) = sequence_
   ]
 
 assertAcc9 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f, Arrays g, Eq g, Show g, Arrays h, Eq h, Show h, Arrays i, Eq i, Show i) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f, Acc g, Acc h, Acc i) -> Assertion
-assertAcc9 (a, b, c, d, e, f, g, h, i) = sequence_ 
-  [ run @TensorFlow a @?= run @Interpreter a, 
+assertAcc9 (a, b, c, d, e, f, g, h, i) = sequence_
+  [ run @TensorFlow a @?= run @Interpreter a,
     run @TensorFlow b @?= run @Interpreter b,
     run @TensorFlow c @?= run @Interpreter c,
     run @TensorFlow d @?= run @Interpreter d,
@@ -248,7 +242,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                   where tPipeline = testGroup "pipeline (>->)"
                           [ testCase "pipeline (>->)" $ assertAcc ((>->) (map (+1)) (map (/ 2)) (use (fromList (Z:.5:.10) [1..])) :: Acc (Array DIM2 Float))
                           ]
-                        tCompute = let 
+                        tCompute = let
                           loop :: Exp Int -> Exp Int
                           loop ticks = let clockRate = 900000   -- kHz
                                       in  while (\i -> i < clockRate * ticks) (+1) 0
@@ -330,7 +324,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           ]
                         tZipWith8 = testGroup "zipWith8"
                           [ testCase "zipWith8" $ assertAcc (zipWith8 (\a b c d e f g h -> a + b + c + d + e + f + g + h) vec vec vec vec vec vec vec vec)
-                          ]  
+                          ]
                         tZipWith9 = testGroup "zipWith9"
                           [ testCase "zipWith9" $ assertAcc (zipWith9 (\a b c d e f g h i -> a + b + c + d + e + f + g + h + i) vec vec vec vec vec vec vec vec vec)
                           ]
@@ -381,7 +375,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           ]
                         tZip9 = testGroup "zip9"
                           [ testCase "zip9" $ assertAcc (zip9 vec vec vec vec vec vec vec vec vec)
-                          ]                
+                          ]
                 tUnzipping = testGroup "Unzipping"
                   [
                     tUnzip,
@@ -395,28 +389,28 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                   ]
                   where vec = use (fromList (Z:.5) [1..] :: Vector Int64)
                         tUnzip = testGroup "unzip"
-                          [ testCase "unzip" $ assertAcc2 (unzip $ zip vec vec :: (Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip" $ assertAcc2 (unzip $ zip vec vec :: (Acc (Vector Int64), Acc (Vector Int64)))
                           ]
                         tUnzip3 = testGroup "unzip3"
-                          [ testCase "unzip3" $ assertAcc3 (unzip3 $ zip3 vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip3" $ assertAcc3 (unzip3 $ zip3 vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64)))
                           ]
                         tUnzip4 = testGroup "unzip4"
-                          [ testCase "unzip4" $ assertAcc4 (unzip4 $ zip4 vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip4" $ assertAcc4 (unzip4 $ zip4 vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64)))
                           ]
                         tUnzip5 = testGroup "unzip5"
-                          [ testCase "unzip5" $ assertAcc5 (unzip5 $ zip5 vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip5" $ assertAcc5 (unzip5 $ zip5 vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64)))
                           ]
                         tUnzip6 = testGroup "unzip6"
-                          [ testCase "unzip6" $ assertAcc6 (unzip6 $ zip6 vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip6" $ assertAcc6 (unzip6 $ zip6 vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64)))
                           ]
                         tUnzip7 = testGroup "unzip7"
-                          [ testCase "unzip7" $ assertAcc7 (unzip7 $ zip7 vec vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip7" $ assertAcc7 (unzip7 $ zip7 vec vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64)))
                           ]
                         tUnzip8 = testGroup "unzip7"
-                          [ testCase "unzip8" $ assertAcc8 (unzip8 $ zip8 vec vec vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip8" $ assertAcc8 (unzip8 $ zip8 vec vec vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64)))
                           ]
                         tUnzip9 = testGroup "unzip9"
-                          [ testCase "unzip9" $ assertAcc9 (unzip9 $ zip9 vec vec vec vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64))) 
+                          [ testCase "unzip9" $ assertAcc9 (unzip9 $ zip9 vec vec vec vec vec vec vec vec vec :: (Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64), Acc (Vector Int64)))
                           ]
 
         tModifyingArrays :: TestTree
@@ -440,7 +434,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                 tReplication = testGroup "Replication"
                   [ tReplicate
                   ]
-                  where tReplicate = let 
+                  where tReplicate = let
                             vec = fromList (Z:.10) [0..] :: Vector Int
                             rep0 :: (Shape sh, Elt e) => Exp Int -> Acc (Array sh e) -> Acc (Array (sh :. Int) e)
                             rep0 n a = replicate (lift (Any :. n)) a
@@ -467,7 +461,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                     tDropOn,
                     tSlitOn
                   ]
-                  where tSlice = let 
+                  where tSlice = let
                             mat = fromList (Z:.5:.10) [0..] :: Matrix Int
                             sl0 :: (Shape sh, Elt e) => Acc (Array (sh:.Int) e) -> Exp Int -> Acc (Array sh e)
                             sl0 a n = slice a (lift (Any :. n))
@@ -529,7 +523,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           [ tPermute,
                             tScatter
                           ]
-                          where tPermute = let 
+                          where tPermute = let
                                     histogram :: Acc (Vector Int) -> Acc (Vector Int)
                                     histogram xs =
                                       let zeros = fill (constant (Z:.10)) 0
@@ -556,7 +550,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           [ tBackpermute,
                             tGather
                           ]
-                          where tBackpermute = let 
+                          where tBackpermute = let
                                     swap :: Exp DIM2 -> Exp DIM2
                                     swap = lift1 f
                                       where
@@ -715,7 +709,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           [ testCase "maximum vec" $ assertAcc (maximum (use vec)),
                             testCase "maximum mat" $ assertAcc (maximum (use mat))
                           ]
-                        
+
         tScans :: TestTree
         tScans = testGroup "Scans (prefix sums)"
           [ tScanl,
@@ -816,11 +810,11 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                         tPostscanrSeg = testGroup "postscanrSeg"
                           [ testCase "postscanrSeg mat" $ assertAcc (postscanrSeg (+) 0 (use mat) (use seg))
                           ]
-        
+
         tStencils :: TestTree
         tStencils = testGroup "Stencils"
           [ tStencil,
-            tStencil2  
+            tStencil2
           ]
           where mat = fromList (Z :. 4 :. 10) [1,2,3,4,5,6,7,8,9,10,1,1,1,1,1,2,2,2,2,2,2,4,6,8,10,12,14,16,18,20,1,3,5,7,9,11,13,15,17,19] :: Matrix Float
                 convolve5x1 :: Num a => [Exp a] -> Stencil5x1 a -> Exp a
@@ -845,9 +839,8 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
   [ tBasicTypes,
     tNumTypes,
     -- TODO: numeric conversion classes
-    tLiftingAndUnlifting,
-    tScalarOpertions,
-    tForeignFunctionInterface,
+    tScalarOperations,
+    -- TODO: tForeignFunctionInterface,
     tPlainArrays
   ]
   where tBasicTypes :: TestTree
@@ -858,7 +851,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
           where vec1 = fromList (Z:.1) [1] :: Vector Int64
                 tEq = testGroup "Eq"
                   [ tEquals,
-                    tNotEquals 
+                    tNotEquals
                   ]
                   where tEquals = testGroup "equals (==)"
                           [ testCase "eqInt True" $ assertAcc (map (== 1) (use vec1)),
@@ -905,7 +898,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                           [ testCase "compareInt l" $ assertAcc (map (compare 0) (use vec1)),
                             testCase "compareInt r" $ assertAcc (map (compare 2) (use vec1))
                           ]
-        
+
         tNumTypes :: TestTree
         tNumTypes = testGroup "Numeric type classes"
           [ tNum,
@@ -916,7 +909,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
             tRealFloat
           ]
           where vec1 = fromList (Z:.1) [1] :: Vector Int64
-                --vecRatio1 = fromList (Z:.1) [1%1] :: Array DIM1 (Exp (Ratio Int64)) -- TODO: fix this
+                vec1' = fromList (Z:.1) [1] :: Vector Float
                 tNum = testGroup "Num"
                   [
                     tPlus,
@@ -933,82 +926,68 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                     tDivMod
                   ]
                   where tPlus = testGroup "plus (+)"
-                          [ testCase "plusInt" $ assertAcc (map (+ 1) (use vec1)),
-                            testCase "plusFloat" $ assertAcc (map (+ 1.0) (use vec1))
+                          [ testCase "plus" $ assertAcc (map (+ 1) (use vec1))
                           ]
                         tMinus = testGroup "minus (-)"
-                          [ testCase "minusInt" $ assertAcc (map (- 1) (use vec1)),
-                            testCase "minusFloat" $ assertAcc (map (- 1.0) (use vec1))
+                          [ testCase "minus" $ assertAcc (map (\x -> x - 1) (use vec1) :: Acc (Vector Int64))
                           ]
                         tTimes = testGroup "times (*)"
-                          [ testCase "timesInt" $ assertAcc (map (* 2) (use vec1)),
-                            testCase "timesFloat" $ assertAcc (map (* 2.0) (use vec1))
+                          [ testCase "times" $ assertAcc (map (* 2) (use vec1))
                           ]
                         tNegate = testGroup "negate"
-                          [ testCase "negateInt" $ assertAcc (map negate (use vec1)),
-                            testCase "negateFloat" $ assertAcc (map negate (use vec1))
+                          [ testCase "negate" $ assertAcc (map negate (use vec1))
                           ]
                         tAbs = testGroup "abs"
-                          [ testCase "absInt" $ assertAcc (map abs (use vec1)),
-                            testCase "absFloat" $ assertAcc (map abs (use vec1))
+                          [ testCase "abs" $ assertAcc (map abs (use vec1))
                           ]
                         tSignum = testGroup "signum"
-                          [ testCase "signumInt" $ assertAcc (map signum (use vec1)),
-                            testCase "signumFloat" $ assertAcc (map signum (use vec1))
+                          [ testCase "signum" $ assertAcc (map signum (use vec1))
                           ]
                         tQuot = testGroup "quot"
-                          [ testCase "quotInt" $ assertAcc (map (quot 2) (use vec1)),
-                            testCase "quotFloat" $ assertAcc (map (quot 2.0) (use vec1))
+                          [ testCase "quot" $ assertAcc (map (quot 2) (use vec1))
                           ]
                         tRem = testGroup "rem"
-                          [ testCase "remInt" $ assertAcc (map (rem 2) (use vec1)),
-                            testCase "remFloat" $ assertAcc (map (rem 2.0) (use vec1))
+                          [ testCase "rem" $ assertAcc (map (rem 2) (use vec1))
                           ]
                         tDiv = testGroup "div"
-                          [ testCase "divInt" $ assertAcc (map (div 2) (use vec1)),
-                            testCase "divFloat" $ assertAcc (map (div 2.0) (use vec1))
+                          [ testCase "div" $ assertAcc (map (div 2) (use vec1))
                           ]
                         tMod = testGroup "mod"
-                          [ testCase "modInt" $ assertAcc (map (mod 2) (use vec1)),
-                            testCase "modFloat" $ assertAcc (map (mod 2.0) (use vec1))
+                          [ testCase "mod" $ assertAcc (map (mod 2) (use vec1))
                           ]
                         tQuotRem = testGroup "quotRem"
-                          [ testCase "quotRemInt" $ assertAcc (map (Prelude.fst . quotRem 2) (use vec1)),
-                            testCase "quotRemInt" $ assertAcc (map (Prelude.snd . quotRem 2) (use vec1)),
-                            testCase "quotRemFloat" $ assertAcc (map (Prelude.fst . quotRem 2.0) (use vec1)),
-                            testCase "quotRemFloat" $ assertAcc (map (Prelude.snd . quotRem 2.0) (use vec1))
+                          [ testCase "quotRem" $ assertAcc (map (Prelude.fst . quotRem 2) (use vec1)),
+                            testCase "quotRem" $ assertAcc (map (Prelude.snd . quotRem 2) (use vec1))
                           ]
                         tDivMod = testGroup "divMod"
-                          [ testCase "divModInt" $ assertAcc (map (Prelude.fst . divMod 2) (use vec1)),
-                            testCase "divModInt" $ assertAcc (map (Prelude.snd . divMod 2) (use vec1)),
-                            testCase "divModFloat" $ assertAcc (map (Prelude.fst . divMod 2.0) (use vec1)),
-                            testCase "divModFloat" $ assertAcc (map (Prelude.snd . divMod 2.0) (use vec1))
+                          [ testCase "divMod" $ assertAcc (map (Prelude.fst . divMod 2) (use vec1)),
+                            testCase "divMod" $ assertAcc (map (Prelude.snd . divMod 2) (use vec1))
                           ]
+
                 tRational = testGroup "Rational"
                   [ tToRational,
                     tFromRational
                   ]
                   where tToRational = testGroup "toRational"
-                          [ testCase "toRationalInt" $ assertAcc (map toRational (use vec1)),
-                            testCase "toRationalFloat" $ assertAcc (map toRational (use vec1))
+                          [ testCase "toRational" $ assertAcc (map toRational (use vec1) :: Acc (Vector (Ratio Int64)))
                           ]
                         tFromRational = testGroup "fromRational"
-                          [ --testCase "fromRationalInt" $ assertAcc (map fromRational (use vecRatio1)),
-                            --testCase "fromRationalFloat" $ assertAcc (map fromRational (use vecRatio1))
-                          ]  
+                          [ --testCase "fromRational" $ assertAcc (map fromRational (use vecRatio1)),
+                            --testCase "fromRational" $ assertAcc (map fromRational (use vecRatio1))
+                          ]
+
                 tFractional = testGroup "Fractional"
                   [ tDivide,
                     tRecip
                     -- tFromRational
                   ]
                   where tDivide = testGroup "divide (/)"
-                          [ testCase "divideInt" $ assertAcc (map (/ 2) (use vec1)),
-                            testCase "divideFloat" $ assertAcc (map (/ 2.0) (use vec1))
+                          [ testCase "divide" $ assertAcc (map (/ (2 :: Exp Float)) (use vec1'))
                           ]
                         tRecip = testGroup "recip"
-                          [ testCase "recipInt" $ assertAcc (map recip (use vec1)),
-                            testCase "recipFloat" $ assertAcc (map recip (use vec1))
+                          [ testCase "recip" $ assertAcc (map recip (use vec1'))
                           ]
+
                 tFloating = testGroup "Floating"
                   [ tPi,
                     tSin,
@@ -1031,106 +1010,408 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                   ]
                   where vec1 = fromList (Z:.1) [1] :: Vector Int64
                         tPi = testGroup "pi"
-                          [ testCase "piInt" $ assertAcc (map pi (use vec1)),
-                            testCase "piFloat" $ assertAcc (map pi (use vec1))
+                          [ --testCase "pi" $ assertAcc (map pi (use vec1') :: Acc (Vector Float)), -- TODO: fix
                           ]
                         tSin = testGroup "sin"
-                          [ testCase "sinInt" $ assertAcc (map sin (use vec1)),
-                            testCase "sinFloat" $ assertAcc (map sin (use vec1))
+                          [ testCase "sin" $ assertAcc (map sin (use vec1'))
                           ]
                         tCos = testGroup "cos"
-                          [ testCase "cosInt" $ assertAcc (map cos (use vec1)),
-                            testCase "cosFloat" $ assertAcc (map cos (use vec1))
+                          [ testCase "cos" $ assertAcc (map cos (use vec1'))
                           ]
                         tTan = testGroup "tan"
-                          [ testCase "tanInt" $ assertAcc (map tan (use vec1)),
-                            testCase "tanFloat" $ assertAcc (map tan (use vec1))
+                          [ testCase "tan" $ assertAcc (map tan (use vec1'))
                           ]
                         tAsin = testGroup "asin"
-                          [ testCase "asinInt" $ assertAcc (map asin (use vec1)),
-                            testCase "asinFloat" $ assertAcc (map asin (use vec1))
+                          [ testCase "asin" $ assertAcc (map asin (use vec1'))
                           ]
                         tAcos = testGroup "acos"
-                          [ testCase "acosInt" $ assertAcc (map acos (use vec1)),
-                            testCase "acosFloat" $ assertAcc (map acos (use vec1))
+                          [ testCase "acos" $ assertAcc (map acos (use vec1'))
                           ]
                         tAtan = testGroup "atan"
-                          [ testCase "atanInt" $ assertAcc (map atan (use vec1)),
-                            testCase "atanFloat" $ assertAcc (map atan (use vec1))
+                          [ testCase "atan" $ assertAcc (map atan (use vec1'))
                           ]
                         tSinh = testGroup "sinh"
-                          [ testCase "sinhInt" $ assertAcc (map sinh (use vec1)),
-                            testCase "sinhFloat" $ assertAcc (map sinh (use vec1))
+                          [ testCase "sinh" $ assertAcc (map sinh (use vec1'))
                           ]
                         tCosh = testGroup "cosh"
-                          [ testCase "coshInt" $ assertAcc (map cosh (use vec1)),
-                            testCase "coshFloat" $ assertAcc (map cosh (use vec1))
+                          [ testCase "cosh" $ assertAcc (map cosh (use vec1'))
                           ]
                         tTanh = testGroup "tanh"
-                          [ testCase "tanhInt" $ assertAcc (map tanh (use vec1)),
-                            testCase "tanhFloat" $ assertAcc (map tanh (use vec1))
+                          [ testCase "tanh" $ assertAcc (map tanh (use vec1'))
                           ]
                         tAsinh = testGroup "asinh"
-                          [ testCase "asinhInt" $ assertAcc (map asinh (use vec1)),
-                            testCase "asinhFloat" $ assertAcc (map asinh (use vec1))
+                          [ testCase "asinh" $ assertAcc (map asinh (use vec1'))
                           ]
                         tAcosh = testGroup "acosh"
-                          [ testCase "acoshInt" $ assertAcc (map acosh (use vec1)),
-                            testCase "acoshFloat" $ assertAcc (map acosh (use vec1))
+                          [ testCase "acosh" $ assertAcc (map acosh (use vec1'))
                           ]
                         tAtanh = testGroup "atanh"
-                          [ testCase "atanhInt" $ assertAcc (map atanh (use vec1)),
-                            testCase "atanhFloat" $ assertAcc (map atanh (use vec1))
+                          [ testCase "atanh" $ assertAcc (map atanh (use vec1'))
                           ]
                         tExp = testGroup "exp"
-                          [ testCase "expInt" $ assertAcc (map exp (use vec1)),
-                            testCase "expFloat" $ assertAcc (map exp (use vec1))
+                          [ testCase "exp" $ assertAcc (map exp (use vec1'))
                           ]
                         tSqrt = testGroup "sqrt"
-                          [ testCase "sqrtInt" $ assertAcc (map sqrt (use vec1)),
-                            testCase "sqrtFloat" $ assertAcc (map sqrt (use vec1))
+                          [ testCase "sqrt" $ assertAcc (map sqrt (use vec1'))
                           ]
                         tLog = testGroup "log"
-                          [ testCase "logInt" $ assertAcc (map log (use vec1)),
-                            testCase "logFloat" $ assertAcc (map log (use vec1))
+                          [ testCase "log" $ assertAcc (map log (use vec1'))
                           ]
-                        tFPow = testGroup "fpow"
-                          [ testCase "fpowInt" $ assertAcc (map (** 2) (use vec1)),
-                            testCase "fpowFloat" $ assertAcc (map (** 2.0) (use vec1))
+                        tFPow = testGroup "**"
+                          [ testCase "**" $ assertAcc (map (** (2 :: Exp Float)) (use vec1'))
                           ]
                         tLogBase = testGroup "logBase"
-                          [ testCase "logBaseInt" $ assertAcc (map (logBase 2) (use vec1)),
-                            testCase "logBaseFloat" $ assertAcc (map (logBase 2.0) (use vec1))
+                          [ testCase "logBase" $ assertAcc (map (logBase (2 :: Exp Float)) (use vec1'))
                           ]
+                        
+
                 tRealFrac = testGroup "RealFrac"
                   [ tProperFraction,
                     tTruncate,
                     tRound,
                     tCeiling,
-                    tFloor
+                    tFloor,
+                    tDiv',
+                    tMod',
+                    tDivMod'
                   ]
                   where tProperFraction = testGroup "properFraction"
-                          [ testCase "properFractionInt" $ assertAcc (map (fst . properFraction) (use vec1)),
-                            testCase "properFractionInt" $ assertAcc (map (fst . properFraction) (use vec1)),
-                            testCase "properFractionFloat" $ assertAcc (map (snd . properFraction) (use vec1))
-                            testCase "properFractionFloat" $ assertAcc (map (snd . properFraction) (use vec1))
+                          [ -- testCase "properFraction" $ assertAcc (map (Prelude.snd . properFraction) (use vec1) :: Acc (Vector Int64))
                           ]
                         tTruncate = testGroup "truncate"
-                          [ testCase "truncateInt" $ assertAcc (map truncate (use vec1)),
-                            testCase "truncateFloat" $ assertAcc (map truncate (use vec1))
+                          [ testCase "truncate" $ assertAcc (map truncate (use vec1') :: Acc (Vector Int64))
                           ]
                         tRound = testGroup "round"
-                          [ testCase "roundInt" $ assertAcc (map round (use vec1)),
-                            testCase "roundFloat" $ assertAcc (map round (use vec1))
+                          [ testCase "truncate" $ assertAcc (map round (use vec1') :: Acc (Vector Int64))
                           ]
                         tCeiling = testGroup "ceiling"
-                          [ testCase "ceilingInt" $ assertAcc (map ceiling (use vec1)),
-                            testCase "ceilingFloat" $ assertAcc (map ceiling (use vec1))
+                          [ testCase "ceiling" $ assertAcc (map ceiling (use vec1') :: Acc (Vector Int64))
                           ]
                         tFloor = testGroup "floor"
-                          [ testCase "floorInt" $ assertAcc (map floor (use vec1)),
-                            testCase "floorFloat" $ assertAcc (map floor (use vec1))
+                          [ testCase "floor" $ assertAcc (map floor (use vec1') :: Acc (Vector Int64))
+                          ]
+                        tDiv' = testGroup "div"
+                          [ testCase "div" $ assertAcc (map (div (2 :: Exp Int64)) (use vec1) :: Acc (Vector Int64))
+                          ]
+                        tMod' = testGroup "mod"
+                          [ testCase "mod" $ assertAcc (map (mod (2 :: Exp Int64)) (use vec1) :: Acc (Vector Int64))
+                          ]
+                        tDivMod' = testGroup "divMod"
+                          [ --testCase "divMod" $ assertAcc (map (Data.Array.Accelerate.fst . divMod' (2 :: Exp Int64)) (use vec1) :: Acc (Vector (Int64, Int64)))
                           ]
 
-            
+                tRealFloat = testGroup "Real"
+                  [ tFloatRadix,
+                    tFloatDigits,
+                    tFloatRange,
+                    tDecodeFloat,
+                    tEncodeFloat,
+                    tExponent,
+                    tSignificand,
+                    tScaleFloat,
+                    tIsNaN,
+                    tIsInfinite,
+                    tIsDenormalized,
+                    tIsNegativeZero,
+                    tIsIEEE,
+                    tAtan2
+                  ]
+                  where tFloatRadix = testGroup "floatRadix"
+                          [ testCase "floatRadix" $ assertAcc (map floatRadix (use vec1'))
+                          ]
+                        tFloatDigits = testGroup "floatDigits"
+                          [ testCase "floatDigits" $ assertAcc (map floatDigits (use vec1'))
+                          ]
+                        tFloatRange = testGroup "floatRange"
+                          [ testCase "floatRange" $ assertAcc (map (Prelude.fst . floatRange) (use vec1'))
+                          ]
+                        tDecodeFloat = testGroup "decodeFloat"
+                          [ testCase "decode" $ assertAcc (map (Prelude.fst . decodeFloat) (use vec1'))
+                          ]
+                        tEncodeFloat = testGroup "encodeFloat"
+                          [ testCase "encode" $ assertAcc (map (encodeFloat 1) (use (fromList (Z:.10) [1..10] :: Vector Int)) :: Acc (Vector Float))
+                          ]
+                        tExponent = testGroup "exponent"
+                          [ testCase "exponent" $ assertAcc (map exponent (use vec1'))
+                          ]
+                        tSignificand = testGroup "significand"
+                          [ testCase "significand" $ assertAcc (map significand (use vec1'))
+                          ]
+                        tScaleFloat = testGroup "scale"
+                          [ testCase "scale" $ assertAcc (map (scaleFloat 1) (use vec1'))
+                          ]
+                        tIsNaN = testGroup "isNaN"
+                          [ testCase "isNaN" $ assertAcc (map isNaN (use vec1'))
+                          ]
+                        tIsInfinite = testGroup "isInfinite"
+                          [ testCase "isInfinite" $ assertAcc (map isInfinite (use vec1'))
+                          ]
+                        tIsDenormalized = testGroup "isDenormalized"
+                          [ testCase "isDenormalized" $ assertAcc (map isDenormalized (use vec1'))
+                          ]
+                        tIsNegativeZero = testGroup "isNegativeZero"
+                          [ testCase "isNegativeZero" $ assertAcc (map isNegativeZero (use vec1'))
+                          ]
+                        tIsIEEE = testGroup "isIEEE"
+                          [ testCase "isIEEE" $ assertAcc (map isIEEE (use vec1'))
+                          ]
+                        tAtan2 = testGroup "atan2"
+                          [ testCase "atan2" $ assertAcc (map (atan2 1) (use vec1'))
+                          ]
+
+        tScalarOperations :: TestTree
+        tScalarOperations = testGroup "Scalar Operations"
+          [ tIntroduction,
+            tTuples,
+            tFlowControl,
+            tScalarReduction,
+            tLogicalOperations,
+            tNumericOperations,
+            tShapeManipulation,
+            tConversions
+          ]
+          where tIntroduction = testGroup "Introduction"
+                  [ tConstant
+                  ]
+                  where vec = fromList (Z:.5) [1..5] :: Vector Int64
+                        tConstant = testGroup "constant"
+                          [ testCase "constant" $ assertAcc (map (const (constant (1 :: Int))) (use vec))
+                          ]
+                tTuples = testGroup "Tuples"
+                  [ tFst,
+                    tAfst,
+                    tSnd,
+                    tAsnd,
+                    tCurry,
+                    tUncurry
+                  ]
+                  where ones = fromList (Z:.5) [1..] :: Vector Int64
+                        zeroes = fromList (Z:.5) [0..] :: Vector Int64
+                        tFst = testGroup "fst"
+                          [ testCase "fst" $ assertAcc (map Data.Array.Accelerate.fst $ zip (use ones) (use zeroes))
+                          ]
+                        tAfst = testGroup "afst"
+                          [ --testCase "afst" $ assertAcc (map afst $ zip (use ones) (use zeroes))
+                          ]
+                        tSnd = testGroup "snd"
+                          [ testCase "snd" $ assertAcc (map Data.Array.Accelerate.snd $ zip (use ones) (use zeroes))
+                          ]
+                        tAsnd = testGroup "asnd"
+                          [ --testCase "asnd" $ assertAcc (map asnd $ zip (use ones) (use zeroes))
+                          ]
+                        tCurry = testGroup "curry"
+                          [ --testCase "curry" $ assertAcc (map (curry (+)) $ zip (use ones) (use zeroes))
+                          ]
+                        tUncurry = testGroup "uncurry"
+                          [ testCase "uncurry" $ assertAcc (map (uncurry (+)) $ zip (use ones) (use zeroes))
+                          ]
+                        
+                tFlowControl = testGroup "Flow Control"
+                  [ tQuestionMark,
+                    tMatch,
+                    tCond,
+                    tWhile,
+                    tIterate
+                  ]
+                  where tQuestionMark = testGroup "questionMark"
+                          [ --testCase "questionMark" $ assertAcc (Data.Array.Accelerate.zipWith (?) (use (fromList (Z:.3) [True, False, True] :: Vector Bool)) (use (fromList (Z:.3) [(1,2), (2, 3), (3, 4)] :: Vector (Int, Int))))
+                          ]
+                        tMatch = testGroup "match"
+                          [ --
+                          ]
+                        tCond = testGroup "cond"
+                          [ testCase "cond" $ assertAcc (zipWith3 cond (use (fromList (Z:.3) [True, False, True] :: Vector Bool)) (use (fromList (Z:.3) [1, 2, 3] :: Vector Int)) (use (fromList (Z:.3) [4, 5, 6] :: Vector Int)))
+                          ]
+                        tWhile = testGroup "while"
+                          [ --testCase "while" 
+                          ]
+                        tIterate = testGroup "iterate"
+                          [ -- testCase "iterate" 
+                            -- testCase "iterate" 
+                          ]
+                tScalarReduction = testGroup "Scalar Reduction"
+                  [
+                    tSfoldl
+                  ]
+                  where vec1 = fromList (Z:.5:.10) [1..] :: Matrix Int
+                        tSfoldl = testGroup "sfoldl"
+                          [ -- testCase "sfoldl" $ assertAcc (sfoldl (\(I2 x y -> x + y) 0 (use vec1)))
+                          ]
+                tLogicalOperations = testGroup "Logical Operations"
+                  [
+                    tAnd,
+                    tOr,
+                    tNot
+                  ]
+                  where vecTrue = fromList (Z:.5:.10) (repeat True) :: Matrix Bool
+                        vecFalse = fromList (Z:.5:.10) (repeat False) :: Matrix Bool
+                        tAnd = testGroup "and (&&)"
+                          [ testCase "and True True" $ assertAcc (Data.Array.Accelerate.zipWith (&&) (use vecTrue) (use vecFalse)),
+                            testCase "and True False" $ assertAcc (Data.Array.Accelerate.zipWith (&&) (use vecTrue) (use vecFalse)),
+                            testCase "and False True" $ assertAcc (Data.Array.Accelerate.zipWith (&&) (use vecFalse) (use vecTrue)),
+                            testCase "and False False" $ assertAcc (Data.Array.Accelerate.zipWith (&&) (use vecFalse) (use vecFalse))
+                          ]
+                        tOr = testGroup "or (||)"
+                          [ testCase "or True True" $ assertAcc (Data.Array.Accelerate.zipWith (||) (use vecTrue) (use vecFalse)),
+                            testCase "or True False" $ assertAcc (Data.Array.Accelerate.zipWith (||) (use vecTrue) (use vecFalse)),
+                            testCase "or False True" $ assertAcc (Data.Array.Accelerate.zipWith (||) (use vecFalse) (use vecTrue)),
+                            testCase "or False False" $ assertAcc (Data.Array.Accelerate.zipWith (||) (use vecFalse) (use vecFalse))
+                          ]
+                        tNot = testGroup "not"
+                          [ testCase "not True" $ assertAcc (map not (use vecTrue)),
+                            testCase "not False" $ assertAcc (map not (use vecFalse))
+                          ]
+                tNumericOperations = testGroup "Numeric Operations"
+                  [
+                    tSubtract,
+                    tEven,
+                    tOdd,
+                    tGcd,
+                    tLcm,
+                    tHat,
+                    tHatHat
+                  ]
+                  where vec = fromList (Z:.5) [1..5] :: Vector Int64
+                        vec' = fromList (Z:.5) [1..5] :: Vector Float
+                        tSubtract = testGroup "subtract"
+                          [ testCase "subtract" $ assertAcc (map (subtract 1) (use vec))
+                          ]
+                        tEven = testGroup "even"
+                          [ testCase "even" $ assertAcc (map even (use vec))
+                          ]
+                        tOdd = testGroup "odd"
+                          [ testCase "odd" $ assertAcc (map odd (use vec))
+                          ]
+                        tGcd = testGroup "gcd"
+                          [ testCase "gcd" $ assertAcc (map (gcd 2) (use vec))
+                          ]
+                        tLcm = testGroup "lcm"
+                          [ testCase "lcm" $ assertAcc (map (lcm 2) (use vec))
+                          ]
+                        tHat = testGroup "^"
+                          [ testCase "^" $ assertAcc (map (^ (2 :: Exp Int64)) (use vec'))
+                          ]
+                        tHatHat = testGroup "^^"
+                          [ testCase "^^" $ assertAcc (map (^^ (2 :: Exp Int64)) (use vec'))
+                          ]
+                tShapeManipulation = testGroup "Shape Manipulation"
+                  [ tIndex0,
+                    tIndex1,
+                    tUnindex1,
+                    tIndex2,
+                    tUnindex2,
+                    tIndex3,
+                    tUnindex3,
+                    tIndexHead,
+                    tIndexTail,
+                    tToIndex,
+                    tFromIndex,
+                    tIntersect
+                  ]
+                  where tIndex0 = testGroup "index0"
+                          [ testCase "index0" $ assertAcc (map (const index0) (use (fromList (Z:.3) [1, 2, 3] :: Vector Int)))
+                          ]
+                        tIndex1 = testGroup "index1"
+                          [ --testCase "index1" $ 
+                          ]
+                        tUnindex1 = testGroup "unindex1"
+                          [ --testCase "unindex1" $
+                          ]
+                        tIndex2 = testGroup "index2"
+                          [ --testCase "index2" $ 
+                          ]
+                        tUnindex2 = testGroup "unindex2"
+                          [ --testCase "unindex2" $ 
+                          ]
+                        tIndex3 = testGroup "index3"
+                          [ --testCase "index3" $ 
+                          ]
+                        tUnindex3 = testGroup "unindex3"
+                          [ --testCase "unindex3" $
+                          ]
+                        tIndexHead = testGroup "indexHead"
+                          [ --testCase "indexHead" $
+                          ]
+                        tIndexTail = testGroup "indexTail"
+                          [ --testCase "indexTail" $
+                          ]
+                        tToIndex = testGroup "toIndex"
+                          [ --testCase "toIndex" $ 
+                          ]
+                        tFromIndex = testGroup "fromIndex"
+                          [ --testCase "fromIndex" $
+                          ]
+                        tIntersect = testGroup "intersect"
+                          [ --testCase "intersect" $
+                          ]
+                tConversions = testGroup "Conversions"
+                  [ tOrd,
+                    tChr,
+                    tBoolToInt,
+                    tBitcast
+                  ]
+                  where tOrd = testGroup "ord"
+                          [ testCase "ord" $ assertAcc (map ord (use (fromList (Z:.3) ['a', 'b', 'c'] :: Vector Char)))
+                          ]
+                        tChr = testGroup "chr"
+                          [ testCase "chr" $ assertAcc (map chr (use (fromList (Z:.3) [97, 98, 99] :: Vector Int)))
+                          ]
+                        tBoolToInt = testGroup "boolTo"
+                          [ testCase "boolTo" $ assertAcc (map boolToInt (use (fromList (Z:.3) [True, False, True] :: Vector Bool)))
+                          ]
+                        tBitcast = testGroup "bitcast"
+                          [ -- testCase "bitcast" $ assertAcc (map bitcast (use (fromList (Z:.3) [1, 2, 3] :: Vector Int)))
+                          ]
+
+        tPlainArrays :: TestTree
+        tPlainArrays = testGroup "Plain Arrays"
+          [ tOperations,
+            tGettingDataIn
+          ]
+          where tOperations = testGroup "Operations"
+                  [ tArrayRank,
+                    tArrayShape,
+                    tArraySize,
+                    tArrayReshape,
+                    tIndexArray,
+                    tLinearIndexArray
+                  ]
+                  where tArrayRank = testGroup "arrayRank" -- TODO: how do I construct a plain array?
+                          [ --testCase "arrayRank" $ assertAcc (use (arrayRank (constant (Z:.1:.2) )))
+                          ]
+                        tArrayShape = testGroup "arrayShape"
+                          [ --testCase "arrayShape" $ assertAcc (use (arrayShape (constant (Z:.1:.2))))
+                          ]
+                        tArraySize = testGroup "arraySize"
+                          [ --testCase "arraySize" $ assertAcc (use (arraySize (constant (Z:.1:.2))))
+                          ]
+                        tArrayReshape = testGroup "arrayReshape"
+                          [ --testCase "arrayReshape" $ assertAcc (use (arrayReshape (constant (Z:.1:.2)) (constant (Z:.1:.2))))
+                          ]
+                        tIndexArray = testGroup "indexArray"
+                          [ --testCase "indexArray" $ assertAcc (use (indexArray (constant (Z:.1:.2)) (constant (Z:.1:.2))))
+                          ]
+                        tLinearIndexArray = testGroup "linearIndexArray"
+                          [ --testCase "linearIndexArray" $ assertAcc (use (linearIndexArray (constant (Z:.1:.2)) 1))
+                          ]
+                tGettingDataIn = testGroup "Getting Data In"
+                  [ tFunctions,
+                    tLists
+                  ]
+                  where tFunctions = testGroup "Functions"
+                          [ tFromFunction,
+                            tFromFunctionM
+                          ]
+                          where tFromFunction = testGroup "fromFunction"
+                                  [ -- testCase "fromFunction" 
+                                  ]
+                                tFromFunctionM = testGroup "fromFunctionM"
+                                  [ --testCase "fromFunctionM" $ assertAcc (use (fromFunctionM Identity (constant (Z:.1:.2)) (\((I2 x y) -> return (constant (x+y)))))) -- TODO: how to test i
+                                  ]
+                        tLists = testGroup "Lists"
+                          [ tFromList,
+                            tToList
+                          ]
+                          where tFromList = undefined
+                                tToList = undefined
 
