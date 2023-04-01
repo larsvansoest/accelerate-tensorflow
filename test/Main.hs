@@ -1412,6 +1412,10 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                           [ tFromList,
                             tToList
                           ]
-                          where tFromList = undefined
-                                tToList = undefined
+                          where tFromList = testGroup "fromList"
+                                  [ testCase "fromList" $ assertAcc (use (fromList (Z:.1:.2) [1, 2] :: Array DIM2 Int))
+                                  ]	
+                                tToList = testGroup "toList"
+                                  [ -- testCase "toList" $ assertAcc (toList (use (fromList (Z:.1:.2) [1, 2] :: Array DIM2 Int)))
+                                  ]
 
