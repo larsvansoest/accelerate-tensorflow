@@ -9,4 +9,4 @@ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$SCRIPT_PATH/../extra-deps/tf2101/lib
 export TF_CPP_MIN_LOG_LEVEL=2
 
 cd $PROJECT_DIR
-stack test
+stack test > $SCRIPT_PATH/../test.log

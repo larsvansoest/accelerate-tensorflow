@@ -13,6 +13,9 @@ import Test.Tasty.HUnit
 import Data.Array.Accelerate (Vector)
 import Control.Monad (sequence_)
 import Data.Array.Accelerate.Data.Ratio (Ratio, (%))
+import Data.Accelerate.TensorFlow.Operation (TensorOp)
+import Data.Array.Accelerate.Pretty.Schedule (PrettySchedule)
+import Data.Array.Accelerate.AST.Schedule.Sequential (SequentialSchedule)
 
 type Stencil5x1 a = (Stencil3 a, Stencil5 a, Stencil3 a)
 type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
@@ -27,7 +30,7 @@ tests = testGroup "tests"
   ]
 
 -- | Runs the given Accelerate computation on both interpreter and tensorflow backends and compares the results.
-assertAcc :: (Arrays t, Eq t, Show t) => Acc t -> Assertion
+assertAcc :: (Arrays t, Eq t, Show t, DesugarAcc TensorOp, PrettySchedule SequentialSchedule) => Acc t -> Assertion
 assertAcc acc = run @TensorFlow acc @?= run @Interpreter acc
 
 assertAcc2 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b) => (Acc a, Acc b) -> Assertion
@@ -222,12 +225,12 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                     tIfThenElse
                   ]
                   where tIacond = testGroup "infix acond (?|)"
-                          [ testCase "(?|) true" $ assertAcc (True_ ?| (use $ fromList (Z:.5:.10) [0..], use $ fromList (Z:.5:.10) [1..]) :: Acc (Array DIM2 Int64)),
-                            testCase "(?|) false" $ assertAcc (False_ ?| (use $ fromList (Z:.5:.10) [0..], use $ fromList (Z:.5:.10) [1..]) :: Acc (Array DIM2 Int64))
+                          [ testCase "(?|) true" $ assertAcc (True_ ?| (use $ fromList (Z:.5:.10) [0..], use $ fromList (Z:.5:.10) [5..]) :: Acc (Array DIM2 Int64)),
+                            testCase "(?|) false" $ assertAcc (False_ ?| (use $ fromList (Z:.5:.10) [0..], use $ fromList (Z:.5:.10) [5..]) :: Acc (Array DIM2 Int64))
                           ]
                         tAcond = testGroup "acond"
-                          [ testCase "acond true" $ assertAcc (acond True_ (use $ fromList (Z:.5:.10) [0..]) (use $ fromList (Z:.5:.10) [1..]) :: Acc (Array DIM2 Int64)),
-                            testCase "acond false" $ assertAcc (acond False_ (use $ fromList (Z:.5:.10) [0..]) (use $ fromList (Z:.5:.10) [1..]) :: Acc (Array DIM2 Int64))
+                          [ testCase "acond true" $ assertAcc (acond True_ (use $ fromList (Z:.5:.10) [0..]) (use $ fromList (Z:.5:.10) [5..]) :: Acc (Array DIM2 Int64)),
+                            testCase "acond false" $ assertAcc (acond False_ (use $ fromList (Z:.5:.10) [0..]) (use $ fromList (Z:.5:.10) [5..]) :: Acc (Array DIM2 Int64))
                           ]
                         tAWhile = testGroup "awhile"
                           [ testCase "awhile" $ assertAcc (awhile (fold (&&) True_ . map (<= 10)) (map (+ 1)) (use $ fromList (Z:.10) [0..] :: Acc (Array DIM1 Int64)) :: Acc (Array DIM1 Int64))
@@ -1414,7 +1417,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                           ]
                           where tFromList = testGroup "fromList"
                                   [ testCase "fromList" $ assertAcc (use (fromList (Z:.1:.2) [1, 2] :: Array DIM2 Int))
-                                  ]	
+                                  ]
                                 tToList = testGroup "toList"
                                   [ -- testCase "toList" $ assertAcc (toList (use (fromList (Z:.1:.2) [1, 2] :: Array DIM2 Int)))
                                   ]
