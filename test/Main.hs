@@ -13,9 +13,12 @@ import Test.Tasty.HUnit
 import Data.Array.Accelerate (Vector)
 import Control.Monad (sequence_)
 import Data.Array.Accelerate.Data.Ratio (Ratio, (%))
-import Data.Accelerate.TensorFlow.Operation (TensorOp)
-import Data.Array.Accelerate.Pretty.Schedule (PrettySchedule)
-import Data.Array.Accelerate.AST.Schedule.Sequential (SequentialSchedule)
+import Data.Accelerate.TensorFlow.Operation
+import Data.Accelerate.TensorFlow.Desugar
+import Data.Accelerate.TensorFlow.Kernel
+import Data.Array.Accelerate.Pretty.Schedule
+import Data.Array.Accelerate.AST.Schedule.Sequential hiding (Exp)
+import Data.Array.Accelerate.Pretty.Schedule.Sequential
 
 type Stencil5x1 a = (Stencil3 a, Stencil5 a, Stencil3 a)
 type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
@@ -30,7 +33,7 @@ tests = testGroup "tests"
   ]
 
 -- | Runs the given Accelerate computation on both interpreter and tensorflow backends and compares the results.
-assertAcc :: (Arrays t, Eq t, Show t, DesugarAcc TensorOp, PrettySchedule SequentialSchedule) => Acc t -> Assertion
+assertAcc :: (Arrays t, Eq t, Show t) => Acc t -> Assertion
 assertAcc acc = run @TensorFlow acc @?= run @Interpreter acc
 
 assertAcc2 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b) => (Acc a, Acc b) -> Assertion

@@ -3,9 +3,9 @@ tests
     Construction
       Introduction
         use
-          use vec:               OK (0.84s)
-          use mat:               OK (0.01s)
-          use tup:               OK (0.01s)
+          use vec:               OK (1.41s)
+          use mat:               OK (0.02s)
+          use tup:               OK (0.02s)
         unit
           unit 1:                OK (0.01s)
           unit (1, 2):           OK (0.02s)
@@ -18,9 +18,10 @@ tests
               undefined, called at src/Data/Array/Accelerate/Interpreter.hs:598:20 in accelerate-1.3.0.0-G6GmollMgsB9o6d0tMy4vw:Data.Array.Accelerate.Interpreter
             Use -p '/generate 1.2s/' to rerun this test only.
           generate [1..]:        FAIL
-            Exception: not a TF tensor type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Kernel.hs:198:57 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Kernel
             Use -p '/generate [1..]/' to rerun this test only.
         Fill
           fill 1.2s:             FAIL
@@ -32,43 +33,47 @@ tests
       Enumeration
         enumFromN
           x+1:                   FAIL
-            Exception: not a TF tensor type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Kernel.hs:198:57 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Kernel
             Use -p '/x+1/' to rerun this test only.
         enumFromStepN
           x+ny:                  FAIL
-            Exception: not a TF tensor type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Kernel.hs:198:57 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Kernel
             Use -p '/x+ny/' to rerun this test only.
       Concatenation
         ++
           ++:                    FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/++/' to rerun this test only.
       Expansion
         expand
           expand:                FAIL
-            Exception: not a TF num type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:198:42 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:333:38 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/expand/' to rerun this test only.
     Composition
       Flow Control
         infix acond (?|)
-          (?|) true:             OK (0.01s)
+          (?|) true:             OK (0.02s)
           (?|) false:            OK (0.01s)
         acond
           acond true:            OK
           acond false:           OK
         awhile
           awhile:                FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/awhile/' to rerun this test only.
         if then else
           if then else:          OK (0.01s)
@@ -82,29 +87,32 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:402:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:277:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/compute/' to rerun this test only.
     Element-wise operations
       Indexing
         indexed
           indexed vec:           FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/indexed vec/' to rerun this test only.
           indexed mat:           FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/indexed mat/' to rerun this test only.
       Mapping
         map
-          map:                   OK (0.02s)
+          map:                   OK (0.03s)
         imap
           imap:                  FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/imap/' to rerun this test only.
       Zipping
         zipWith
@@ -112,168 +120,168 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith.zipWith/' to rerun this test only.
         zipWith3
           zipWith3:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith3.zipWith3/' to rerun this test only.
         zipWith4
           zipWith4:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith4.zipWith4/' to rerun this test only.
         zipWith5
           zipWith5:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith5.zipWith5/' to rerun this test only.
         zipWith6
           zipWith6:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith6.zipWith6/' to rerun this test only.
         zipWith7
           zipWith7:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith7.zipWith7/' to rerun this test only.
         zipWith8
           zipWith8:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith8.zipWith8/' to rerun this test only.
         zipWith9
           zipWith9:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zipWith9.zipWith9/' to rerun this test only.
         izipWith
           izipWith:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith.izipWith/' to rerun this test only.
         izipWith3
           izipWith3:             FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith3/' to rerun this test only.
         izipWith4
           izipWith4:             FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith4/' to rerun this test only.
         izipWith5
           izipWith5:             FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith5/' to rerun this test only.
         izipWith6
           izipWith6:             FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith6/' to rerun this test only.
         izipWith7
           izipWith7:             FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith7/' to rerun this test only.
         izipWith8
           izipWith8:             FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith8/' to rerun this test only.
         izipWith9
           izipWith9:             FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/izipWith9/' to rerun this test only.
         zip
           zip:                   FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip.zip/' to rerun this test only.
         zip3
           zip3:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip3.zip3/' to rerun this test only.
         zip4
           zip4:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip4.zip4/' to rerun this test only.
         zip5
           zip5:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip5.zip5/' to rerun this test only.
         zip6
           zip6:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip6.zip6/' to rerun this test only.
         zip7
           zip7:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip7.zip7/' to rerun this test only.
         zip8
           zip8:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip8.zip8/' to rerun this test only.
         zip9
           zip9:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/zip9.zip9/' to rerun this test only.
       Unzipping
         unzip
@@ -281,56 +289,56 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip.unzip/' to rerun this test only.
         unzip3
           unzip3:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip3/' to rerun this test only.
         unzip4
           unzip4:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip4/' to rerun this test only.
         unzip5
           unzip5:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip5/' to rerun this test only.
         unzip6
           unzip6:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip6/' to rerun this test only.
         unzip7
           unzip7:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip7.unzip7/' to rerun this test only.
         unzip7
           unzip8:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip8/' to rerun this test only.
         unzip9
           unzip9:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/unzip9/' to rerun this test only.
     Modifying Arrays
       Shape manipulation
@@ -344,37 +352,37 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:397:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:272:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '$0=="tests.The Accelerate Array Language.Modifying Arrays.Replication.replicate.replicate 2d"' to rerun this test only.
           replicate 2d columns:  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:397:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:272:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/replicate 2d columns/' to rerun this test only.
           replicate 2x1d, 3x 3d: FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:397:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:272:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/replicate 2x1d, 3x 3d/' to rerun this test only.
           rep0 1d:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:397:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:272:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/rep0 1d/' to rerun this test only.
           rep0 2d:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:397:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:272:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/rep0 2d/' to rerun this test only.
           rep1:                  FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:397:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:272:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/rep1/' to rerun this test only.
       Extracting subarrays
         slice
@@ -382,550 +390,617 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:398:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:273:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/slice mat 1d/' to rerun this test only.
           slice mat 0d:          FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:398:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:273:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/slice mat 0d/' to rerun this test only.
           sl0 vec:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:398:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:273:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/sl0 vec/' to rerun this test only.
           sl0 mat:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:398:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:273:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/sl0 mat/' to rerun this test only.
           sl1 mat:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:398:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:273:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/sl1 mat/' to rerun this test only.
           sl1 cube:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:398:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:273:32 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/sl1 cube/' to rerun this test only.
         init
           init mat:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/init mat/' to rerun this test only.
           init vec:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/init vec/' to rerun this test only.
         tail
           tail mat:              FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/tail mat/' to rerun this test only.
           tail vec:              FAIL
-            Exception: not a TF num type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:198:42 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/tail vec/' to rerun this test only.
         take
           take mat:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/take mat/' to rerun this test only.
           take vec:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/take vec/' to rerun this test only.
         drop
           drop mat:              FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/drop mat/' to rerun this test only.
           drop vec:              FAIL
-            Exception: not a TF num type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:198:42 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/drop vec/' to rerun this test only.
         slit
           slit mat:              FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/slit mat/' to rerun this test only.
           slit vec:              FAIL
-            Exception: not a TF num type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:198:42 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/slit vec/' to rerun this test only.
       Permutations
         Forward Permutation (scatter)
           permute
             histogram:           FAIL
-              Exception: not a TF all type
+              Exception: Prelude.undefined
               CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+                error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+                undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
               Use -p '/histogram/' to rerun this test only.
             identity:            FAIL
-              Exception: not a TF all type
+              Exception: Prelude.undefined
               CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+                error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+                undefined, called at src/Data/Accelerate/TensorFlow/Kernel.hs:198:57 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Kernel
               Use -p '/identity/' to rerun this test only.
           scatter
             scatter:             FAIL
-              Exception: not a TF all type
+              Exception: Prelude.undefined
               CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+                error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+                undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
               Use -p '/scatter.scatter/' to rerun this test only.
         Backward Permutation (gather)
           backpermute
             backpermute swap:    FAIL
-              Exception: not a TF all type
+              Exception: Prelude.undefined
               CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+                error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+                undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
               Use -p '/backpermute swap/' to rerun this test only.
           gather
             gather:              FAIL
-              Exception: not a TF all type
+              Exception: Prelude.undefined
               CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+                error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+                undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
               Use -p '/gather.gather/' to rerun this test only.
         Specialised Permutations
           reverse
             reverse vec:         FAIL
-              Exception: not a TF num type
+              Exception: Prelude.undefined
               CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:198:42 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+                error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+                undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
               Use -p '/reverse vec/' to rerun this test only.
           transpose
             transpose mat:       FAIL
-              Exception: not a TF all type
+              Exception: Prelude.undefined
               CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+                error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+                undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
               Use -p '/transpose mat/' to rerun this test only.
       Filtering
         filter
           filter even:           FAIL
-            Exception: not a TF tensor type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/filter even/' to rerun this test only.
           filter odd:            FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/filter odd/' to rerun this test only.
         compact
           compact even:          FAIL
-            Exception: not a TF tensor type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/compact even/' to rerun this test only.
           compact odd:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/compact odd/' to rerun this test only.
     Folding
       fold
         fold + 42:               FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/fold + 42/' to rerun this test only.
         fold maximumSegmentSum:  FAIL
-          Exception: not a TF ord type
+          Exception: impossible
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/fold maximumSegmentSum/' to rerun this test only.
       fold1
         fold1 + 42:              FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/fold1 + 42/' to rerun this test only.
         fold1 maximumSegmentSum: FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/fold1 maximumSegmentSum/' to rerun this test only.
       foldAll
         foldAll + 42 vec:        FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/foldAll + 42 vec/' to rerun this test only.
         foldAll + 0 mat:         FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/foldAll + 0 mat/' to rerun this test only.
       fold1All
         fold1All + 42 vec:       FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/fold1All + 42 vec/' to rerun this test only.
         fold1All + 0 mat:        FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/fold1All + 0 mat/' to rerun this test only.
       Segmented Reductions
         foldSeg
           foldSeg vec:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/foldSeg vec/' to rerun this test only.
           foldSeg mat:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/foldSeg mat/' to rerun this test only.
         fold1Seg
           fold1Seg vec:          FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/fold1Seg vec/' to rerun this test only.
           fold1Seg mat:          FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/fold1Seg mat/' to rerun this test only.
       Specialised Reductions
         all
           all vec:               FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/all vec/' to rerun this test only.
           all mat:               FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/all mat/' to rerun this test only.
         any
           any vec:               FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/any vec/' to rerun this test only.
           any mat:               FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/any mat/' to rerun this test only.
         and
           and vec all True:      FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/and vec all True/' to rerun this test only.
           and vec some False:    FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/and vec some False/' to rerun this test only.
           and vec all False:     FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/and vec all False/' to rerun this test only.
         or
           or vec all True:       FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/or vec all True/' to rerun this test only.
           or vec some False:     FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/or vec some False/' to rerun this test only.
           or vec all False:      FAIL
-            Exception: not a TF ord type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/or vec all False/' to rerun this test only.
         sum
           sum vec:               FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/sum vec/' to rerun this test only.
           sum mat:               FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/sum mat/' to rerun this test only.
         product
           product vec:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/product vec/' to rerun this test only.
           product mat:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/product mat/' to rerun this test only.
         minimum
           minimum vec:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/minimum vec/' to rerun this test only.
           minimum mat:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/minimum mat/' to rerun this test only.
         maximum
           maximum vec:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/maximum vec/' to rerun this test only.
           maximum mat:           FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/maximum mat/' to rerun this test only.
     Scans (prefix sums)
       scanl
         scanl vec:               FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanl.scanl vec/' to rerun this test only.
         scanl mat:               FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanl.scanl mat/' to rerun this test only.
       scanl1
         scanl1 vec:              FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanl1 vec/' to rerun this test only.
         scanl1 mat:              FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanl1 mat/' to rerun this test only.
       scanl'
         scanl' vec:              FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanl'\'' vec/' to rerun this test only.
         scanl' mat:              FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanl'\'' mat/' to rerun this test only.
       scanr
         scanr vec:               FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanr.scanr vec/' to rerun this test only.
         scanr mat:               FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanr.scanr mat/' to rerun this test only.
       scanr1
         scanr1 vec:              FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanr1 vec/' to rerun this test only.
         scanr1 mat:              FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanr1 mat/' to rerun this test only.
       scanr'
         scanr' vec:              FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanr'\'' vec/' to rerun this test only.
         scanr' mat:              FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/scanr'\'' mat/' to rerun this test only.
       prescanl
         prescanl vec:            FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/prescanl vec/' to rerun this test only.
         prescanl mat:            FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/prescanl mat/' to rerun this test only.
       postscanl
         postscanl vec:           FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/postscanl vec/' to rerun this test only.
         postscanl mat:           FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/postscanl mat/' to rerun this test only.
       prescanr
         prescanr vec:            FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/prescanr vec/' to rerun this test only.
         prescanr mat:            FAIL
-          Exception: not a TF ord type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/prescanr mat/' to rerun this test only.
       postscanr
         postscanr vec:           FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/postscanr vec/' to rerun this test only.
         postscanr mat:           FAIL
           Exception: Prelude.undefined
           CallStack (from HasCallStack):
             error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-            undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:389:5 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:247:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/postscanr mat/' to rerun this test only.
       segmented scans
         scanlSeg
           scanlSeg mat:          FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/scanlSeg.scanlSeg mat/' to rerun this test only.
         scanl1Seg
           scanl1Seg mat:         FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/scanl1Seg mat/' to rerun this test only.
         scanl'Seg
           scanl'Seg mat:         FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/scanl'\''Seg mat/' to rerun this test only.
         prescanlSeg
           prescanlSeg mat:       FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/prescanlSeg mat/' to rerun this test only.
         postscanlSeg
           postscanlSeg mat:      FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/postscanlSeg mat/' to rerun this test only.
         scanrSeg
           scanrSeg mat:          FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/scanrSeg.scanrSeg mat/' to rerun this test only.
         scanr1Seg
           scanr1Seg mat:         FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/scanr1Seg mat/' to rerun this test only.
         scanr'Seg
           scanr'Seg mat:         FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/scanr'\''Seg mat/' to rerun this test only.
         prescanrSeg
           prescanrSeg mat:       FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/prescanrSeg mat/' to rerun this test only.
         postscanrSeg
           postscanrSeg mat:      FAIL
-            Exception: not a TF ord type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:286:58 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/postscanrSeg mat/' to rerun this test only.
     Stencils
       stencil
         stencil blur:            FAIL
-          Exception: not a TF num type
+          Exception: Prelude.undefined
           CallStack (from HasCallStack):
-            error, called at src/Data/Accelerate/TensorFlow/Type.hs:198:42 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+            undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
           Use -p '/stencil blur/' to rerun this test only.
   The Accelerate Expression Language
     Basic type classes
       Eq
         equals (==)
-          eqInt True:            OK (0.02s)
+          eqInt True:            OK (0.03s)
           eqInt False:           OK (0.02s)
         not equals (/=)
           neqInt True:           OK (0.02s)
-          neqInt False:          OK (0.01s)
+          neqInt False:          OK (0.02s)
       Ord
         less than (<)
           ltInt True:            OK (0.02s)
           ltInt False:           OK (0.02s)
         less than equals (<=)
           lteInt True:           OK (0.02s)
-          lteInt False:          OK (0.01s)
+          lteInt False:          OK (0.02s)
         greater than (>)
           gtInt True:            OK (0.02s)
           gtInt False:           OK (0.02s)
         greater than equals (>=)
           gteInt True:           OK (0.02s)
-          gteInt False:          OK (0.01s)
+          gteInt False:          OK (0.02s)
         min
           minInt l:              OK (0.02s)
           minInt r:              OK (0.02s)
         max
-          maxInt l:              OK (0.02s)
-          maxInt r:              OK (0.01s)
+          maxInt l:              OK (0.03s)
+          maxInt r:              OK (0.02s)
         compare
-          compareInt l:          OK (0.03s)
-          compareInt r:          OK (0.03s)
+          compareInt l:          FAIL
+            Exception: impossible
+            CallStack (from HasCallStack):
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
+            Use -p '/compareInt l/' to rerun this test only.
+          compareInt r:          FAIL
+            Exception: impossible
+            CallStack (from HasCallStack):
+              error, called at src/Data/Accelerate/TensorFlow/Desugar.hs:282:16 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
+            Use -p '/compareInt r/' to rerun this test only.
     Numeric type classes
       Num
         plus (+)
@@ -933,48 +1008,50 @@ tests
         minus (-)
           minus:                 OK (0.02s)
         times (*)
-          times:                 OK (0.01s)
+          times:                 OK (0.02s)
         negate
-          negate:                OK (0.01s)
+          negate:                OK (0.02s)
         abs
           abs:                   OK (0.02s)
         signum
-          signum:                OK (0.01s)
+          signum:                OK (0.02s)
         quot
           quot:                  OK (0.02s)
         rem
-          rem:                   OK (0.02s)
+          rem:                   FAIL
+            Exception: Prelude.undefined
+            CallStack (from HasCallStack):
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Execute.hs:209:96 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
+            Use -p '/rem/' to rerun this test only.
         div
           div:                   FAIL
             Exception: TensorFlowException TF_INVALID_ARGUMENT "No OpKernel was registered to support Op 'RealDiv' used by {{node RealDiv_3}} with these attrs: [T=DT_INT64]\nRegistered devices: [CPU, GPU]\nRegistered kernels:\n  device='XLA_CPU_JIT'; T in [DT_FLOAT, DT_DOUBLE, DT_INT32, DT_UINT8, DT_INT16, DT_INT8, DT_COMPLEX64, DT_INT64, DT_BFLOAT16, DT_UINT16, DT_COMPLEX128, DT_HALF, DT_UINT32, DT_UINT64]\n  device='XLA_GPU_JIT'; T in [DT_FLOAT, DT_DOUBLE, DT_INT32, DT_UINT8, DT_INT16, DT_INT8, DT_COMPLEX64, DT_INT64, DT_BFLOAT16, DT_UINT16, DT_COMPLEX128, DT_HALF, DT_UINT32, DT_UINT64]\n  device='CPU'; T in [DT_COMPLEX128]\n  device='CPU'; T in [DT_COMPLEX64]\n  device='CPU'; T in [DT_BFLOAT16]\n  device='CPU'; T in [DT_DOUBLE]\n  device='CPU'; T in [DT_HALF]\n  device='CPU'; T in [DT_FLOAT]\n  device='GPU'; T in [DT_COMPLEX128]\n  device='GPU'; T in [DT_COMPLEX64]\n  device='GPU'; T in [DT_DOUBLE]\n  device='GPU'; T in [DT_FLOAT]\n  device='GPU'; T in [DT_HALF]\n\n\t [[RealDiv_3]]"
             Use -p '/Num.div.div/' to rerun this test only.
         mod
-          mod:                   OK (0.02s)
+          mod:                   FAIL
+            Exception: Prelude.undefined
+            CallStack (from HasCallStack):
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Execute.hs:209:96 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
+            Use -p '/Num.mod.mod/' to rerun this test only.
         quotRem
+          quotRem:               OK (0.02s)
           quotRem:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:419:34 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
-            Use -p '$0=="tests.The Accelerate Expression Language.Numeric type classes.Num.quotRem.quotRem"' to rerun this test only.
-          quotRem:               FAIL
-            Exception: Prelude.undefined
-            CallStack (from HasCallStack):
-              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:419:34 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Execute.hs:209:96 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
             Use -p '$0=="tests.The Accelerate Expression Language.Numeric type classes.Num.quotRem.quotRem"' to rerun this test only.
         divMod
           divMod:                FAIL
-            Exception: Prelude.undefined
-            CallStack (from HasCallStack):
-              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:422:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+            Exception: TensorFlowException TF_INVALID_ARGUMENT "No OpKernel was registered to support Op 'RealDiv' used by {{node RealDiv_3}} with these attrs: [T=DT_INT64]\nRegistered devices: [CPU, GPU]\nRegistered kernels:\n  device='XLA_CPU_JIT'; T in [DT_FLOAT, DT_DOUBLE, DT_INT32, DT_UINT8, DT_INT16, DT_INT8, DT_COMPLEX64, DT_INT64, DT_BFLOAT16, DT_UINT16, DT_COMPLEX128, DT_HALF, DT_UINT32, DT_UINT64]\n  device='XLA_GPU_JIT'; T in [DT_FLOAT, DT_DOUBLE, DT_INT32, DT_UINT8, DT_INT16, DT_INT8, DT_COMPLEX64, DT_INT64, DT_BFLOAT16, DT_UINT16, DT_COMPLEX128, DT_HALF, DT_UINT32, DT_UINT64]\n  device='CPU'; T in [DT_COMPLEX128]\n  device='CPU'; T in [DT_COMPLEX64]\n  device='CPU'; T in [DT_BFLOAT16]\n  device='CPU'; T in [DT_DOUBLE]\n  device='CPU'; T in [DT_HALF]\n  device='CPU'; T in [DT_FLOAT]\n  device='GPU'; T in [DT_COMPLEX128]\n  device='GPU'; T in [DT_COMPLEX64]\n  device='GPU'; T in [DT_DOUBLE]\n  device='GPU'; T in [DT_FLOAT]\n  device='GPU'; T in [DT_HALF]\n\n\t [[RealDiv_3]]"
             Use -p '$0=="tests.The Accelerate Expression Language.Numeric type classes.Num.divMod.divMod"' to rerun this test only.
           divMod:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:422:33 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Execute.hs:209:96 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
             Use -p '$0=="tests.The Accelerate Expression Language.Numeric type classes.Num.divMod.divMod"' to rerun this test only.
       Rational
         toRational
@@ -983,50 +1060,50 @@ tests
         divide (/)
           divide:                OK (0.02s)
         recip
-          recip:                 OK (0.01s)
+          recip:                 OK (0.02s)
       Floating
         sin
-          sin:                   OK (0.01s)
+          sin:                   OK (0.02s)
         cos
-          cos:                   OK (0.01s)
+          cos:                   OK (0.02s)
         tan
-          tan:                   OK (0.01s)
+          tan:                   OK (0.02s)
         asin
-          asin:                  OK (0.01s)
+          asin:                  OK (0.02s)
         acos
-          acos:                  OK (0.01s)
+          acos:                  OK (0.02s)
         atan
-          atan:                  OK (0.01s)
+          atan:                  OK (0.02s)
         sinh
-          sinh:                  OK (0.01s)
+          sinh:                  OK (0.02s)
         cosh
-          cosh:                  OK (0.01s)
+          cosh:                  OK (0.02s)
         tanh
-          tanh:                  OK (0.01s)
+          tanh:                  OK (0.02s)
         asinh
-          asinh:                 OK (0.01s)
+          asinh:                 OK (0.02s)
         acosh
-          acosh:                 OK (0.01s)
+          acosh:                 OK (0.02s)
         atanh
-          atanh:                 OK (0.01s)
+          atanh:                 OK (0.02s)
         exp
-          exp:                   OK (0.01s)
+          exp:                   OK (0.02s)
         sqrt
-          sqrt:                  OK (0.01s)
+          sqrt:                  OK (0.02s)
         log
-          log:                   OK (0.01s)
+          log:                   OK (0.02s)
         **
           **:                    FAIL
             Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Execute.hs:240:21 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
+              error, called at src/Data/Accelerate/TensorFlow/Execute.hs:254:21 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
             Use -p '/**/' to rerun this test only.
         logBase
           logBase:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:454:63 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:331:64 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/logBase/' to rerun this test only.
       RealFrac
         truncate
@@ -1034,142 +1111,138 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:456:38 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:333:38 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/truncate.truncate/' to rerun this test only.
         round
           truncate:              FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:457:35 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:334:35 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/round.truncate/' to rerun this test only.
         ceiling
           ceiling:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:459:37 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:336:37 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/ceiling/' to rerun this test only.
         floor
           floor:                 FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:458:35 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:335:35 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/floor/' to rerun this test only.
         div
           div:                   FAIL
             Exception: TensorFlowException TF_INVALID_ARGUMENT "No OpKernel was registered to support Op 'RealDiv' used by {{node RealDiv_3}} with these attrs: [T=DT_INT64]\nRegistered devices: [CPU, GPU]\nRegistered kernels:\n  device='XLA_CPU_JIT'; T in [DT_FLOAT, DT_DOUBLE, DT_INT32, DT_UINT8, DT_INT16, DT_INT8, DT_COMPLEX64, DT_INT64, DT_BFLOAT16, DT_UINT16, DT_COMPLEX128, DT_HALF, DT_UINT32, DT_UINT64]\n  device='XLA_GPU_JIT'; T in [DT_FLOAT, DT_DOUBLE, DT_INT32, DT_UINT8, DT_INT16, DT_INT8, DT_COMPLEX64, DT_INT64, DT_BFLOAT16, DT_UINT16, DT_COMPLEX128, DT_HALF, DT_UINT32, DT_UINT64]\n  device='CPU'; T in [DT_COMPLEX128]\n  device='CPU'; T in [DT_COMPLEX64]\n  device='CPU'; T in [DT_BFLOAT16]\n  device='CPU'; T in [DT_DOUBLE]\n  device='CPU'; T in [DT_HALF]\n  device='CPU'; T in [DT_FLOAT]\n  device='GPU'; T in [DT_COMPLEX128]\n  device='GPU'; T in [DT_COMPLEX64]\n  device='GPU'; T in [DT_DOUBLE]\n  device='GPU'; T in [DT_FLOAT]\n  device='GPU'; T in [DT_HALF]\n\n\t [[RealDiv_3]]"
             Use -p '/RealFrac.div.div/' to rerun this test only.
         mod
-          mod:                   OK
+          mod:                   FAIL
+            Exception: Prelude.undefined
+            CallStack (from HasCallStack):
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Execute.hs:209:96 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
+            Use -p '/RealFrac.mod.mod/' to rerun this test only.
       Real
         floatRadix
-          floatRadix:            OK (0.01s)
+          floatRadix:            OK (0.02s)
         floatDigits
-          floatDigits:           FAIL
-            Exception: not a TF all type
-            CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
-            Use -p '/floatDigits/' to rerun this test only.
+          floatDigits:           OK (0.02s)
         floatRange
-          floatRange:            FAIL
-            Exception: not a TF all type
-            CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
-            Use -p '/floatRange/' to rerun this test only.
+          floatRange:            OK (0.02s)
         decodeFloat
           decode:                FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:406:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:281:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/decode/' to rerun this test only.
         encodeFloat
           encode:                FAIL
-            Exception: not a TF tensor type
+            Exception: impossible
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Execute.hs:254:21 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
             Use -p '/encode/' to rerun this test only.
         exponent
           exponent:              FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:281:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/exponent/' to rerun this test only.
         significand
           significand:           FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:281:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/significand/' to rerun this test only.
         scale
           scale:                 FAIL
-            Exception: not a TF all type
+            Exception: Prelude.undefined
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:339:31 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/scale/' to rerun this test only.
         isNaN
           isNaN:                 FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:462:31 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:339:31 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/isNaN/' to rerun this test only.
         isInfinite
           isInfinite:            FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:463:36 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:340:36 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/isInfinite/' to rerun this test only.
         isDenormalized
           isDenormalized:        FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:406:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:281:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/isDenormalized/' to rerun this test only.
         isNegativeZero
           isNegativeZero:        FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:406:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:281:29 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/isNegativeZero/' to rerun this test only.
         isIEEE
-          isIEEE:                OK (0.01s)
+          isIEEE:                OK (0.02s)
         atan2
           atan2:                 OK (0.02s)
     Scalar Operations
       Introduction
         constant
-          constant:              FAIL
-            Exception: not a TF all type
-            CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:182:77 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
-            Use -p '/constant/' to rerun this test only.
+          constant:              OK (0.02s)
       Tuples
         fst
           fst:                   FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/fst/' to rerun this test only.
         snd
           snd:                   FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/snd/' to rerun this test only.
         uncurry
           uncurry:               FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/uncurry/' to rerun this test only.
       Flow Control
         cond
@@ -1177,7 +1250,7 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/cond.cond/' to rerun this test only.
       Logical Operations
         and (&&)
@@ -1185,50 +1258,50 @@ tests
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/and True True/' to rerun this test only.
           and True False:        FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/and True False/' to rerun this test only.
           and False True:        FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/and False True/' to rerun this test only.
           and False False:       FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/and False False/' to rerun this test only.
         or (||)
           or True True:          FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/or True True/' to rerun this test only.
           or True False:         FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/or True False/' to rerun this test only.
           or False True:         FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/or False True/' to rerun this test only.
           or False False:        FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:391:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:267:89 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/or False False/' to rerun this test only.
         not
           not True:              FAIL
@@ -1241,38 +1314,48 @@ tests
             Use -p '/not False/' to rerun this test only.
       Numeric Operations
         subtract
-          subtract:              OK (0.01s)
+          subtract:              OK (0.02s)
         even
-          even:                  OK (0.02s)
+          even:                  FAIL
+            Exception: Prelude.undefined
+            CallStack (from HasCallStack):
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Execute.hs:209:96 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
+            Use -p '/even.even/' to rerun this test only.
         odd
-          odd:                   OK (0.02s)
+          odd:                   FAIL
+            Exception: Prelude.undefined
+            CallStack (from HasCallStack):
+              error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+              undefined, called at src/Data/Accelerate/TensorFlow/Execute.hs:209:96 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Execute
+            Use -p '/odd.odd/' to rerun this test only.
         gcd
           gcd:                   FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:402:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:277:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/gcd/' to rerun this test only.
         lcm
           lcm:                   FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:402:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:277:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/lcm/' to rerun this test only.
         ^
           ^:                     FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:402:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:277:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/Numeric Operations.^.^/' to rerun this test only.
         ^^
           ^^:                    FAIL
             Exception: Prelude.undefined
             CallStack (from HasCallStack):
               error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
-              undefined, called at src/Data/Accelerate/TensorFlow/Operation.hs:402:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Operation
+              undefined, called at src/Data/Accelerate/TensorFlow/Desugar.hs:277:28 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Desugar
             Use -p '/^^/' to rerun this test only.
       Shape Manipulation
         index0
@@ -1280,30 +1363,25 @@ tests
       Conversions
         ord
           ord:                   FAIL
-            Exception: not a TF tensor type
+            Exception: not a TF vector type
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Type.hs:194:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
             Use -p '/ord/' to rerun this test only.
         chr
           chr:                   FAIL
-            Exception: not a TF tensor type
+            Exception: not a TF vector type
             CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+              error, called at src/Data/Accelerate/TensorFlow/Type.hs:194:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
             Use -p '/chr/' to rerun this test only.
         boolTo
           boolTo:                FAIL
-            Exception: not a TF tensor type
-            CallStack (from HasCallStack):
-              error, called at src/Data/Accelerate/TensorFlow/Type.hs:166:84 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
+            Exception: src/Data/Array/Accelerate/Interpreter.hs:(613,29)-(620,74): Non-exhaustive patterns in case
+            
             Use -p '/boolTo/' to rerun this test only.
     Plain Arrays
       Getting Data In
         Lists
           fromList
-            fromList:            FAIL
-              Exception: not a tensortype
-              CallStack (from HasCallStack):
-                error, called at src/Data/Accelerate/TensorFlow/Type.hs:243:82 in template-accelerate-0.1.0.0-2xmb3nuJj5uHUdxUjWcBOs:Data.Accelerate.TensorFlow.Type
-              Use -p '/fromList/' to rerun this test only.
+            fromList:            OK (0.01s)
 
-185 out of 251 tests failed (1.93s)
+187 out of 251 tests failed (2.95s)

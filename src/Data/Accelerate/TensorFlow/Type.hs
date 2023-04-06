@@ -4,6 +4,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Data.Accelerate.TensorFlow.Type where
 import Data.Int ( Int8, Int16, Int32, Int64 )
@@ -16,12 +17,13 @@ import Data.Array.Accelerate.Type
       IntegralType(..),
       NumType(..),
       SingleType(..), ScalarType(..) )
+import Unsafe.Coerce (unsafeCoerce)
 
 type family Type64 a where
-  Type64 Int = Int64
-  Type64 Word = Word64
-  Type64 a = a
-  
+  Type64 Int   = Int64
+  Type64 Word  = Word64
+  Type64 a     = a
+
 type OneOf types a = TF.OneOf types (Type64 a)
 data OneOfDict types a where
   OneOfDict :: (OneOf types a) => OneOfDict types a
@@ -30,9 +32,57 @@ type TensorType a = TF.TensorType (Type64 a)
 data TensorTypeDict a where
   TensorTypeDict :: TensorType a => TensorTypeDict a
 
-type VectorType a = (S.Storable a, TF.TensorDataType S.Vector (Type64 a), TF.TensorType (Type64 a))
+type VectorType a = (S.Storable a, TF.TensorDataType S.Vector a, TF.TensorType a)
 data VectorTypeDict a where
-  VectorTypeDict :: VectorType a => VectorTypeDict a
+  VectorTypeDict :: VectorType (Type64 a) => VectorTypeDict a
+
+toType64 :: ScalarType e -> ScalarType (Type64 e)
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = SingleScalarType (NumSingleType (IntegralNumType TypeInt64))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeInt8)))   = SingleScalarType (NumSingleType (IntegralNumType TypeInt8))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeInt16)))  = SingleScalarType (NumSingleType (IntegralNumType TypeInt16))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeInt32)))  = SingleScalarType (NumSingleType (IntegralNumType TypeInt32))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeInt64)))  = SingleScalarType (NumSingleType (IntegralNumType TypeInt64))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeWord)))   = SingleScalarType (NumSingleType (IntegralNumType TypeWord64))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeWord8)))  = SingleScalarType (NumSingleType (IntegralNumType TypeWord8))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeWord16))) = SingleScalarType (NumSingleType (IntegralNumType TypeWord16))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeWord32))) = SingleScalarType (NumSingleType (IntegralNumType TypeWord32))
+toType64 (SingleScalarType (NumSingleType (IntegralNumType TypeWord64))) = SingleScalarType (NumSingleType (IntegralNumType TypeWord64))
+toType64 (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   = SingleScalarType (NumSingleType (FloatingNumType TypeHalf))
+toType64 (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  = SingleScalarType (NumSingleType (FloatingNumType TypeFloat))
+toType64 (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) = SingleScalarType (NumSingleType (FloatingNumType TypeDouble))
+toType64 st@(VectorScalarType _)                                         = st
+
+toType64' :: ScalarType e -> e -> Type64 e
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    t = fromIntegral t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt8)))   t = t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt16)))  t = t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt32)))  t = t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt64)))  t = t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord)))   t = fromIntegral t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord8)))  t = t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord16))) t = t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord32))) t = t
+toType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord64))) t = t
+toType64' (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   t = t
+toType64' (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  t = t
+toType64' (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) t = t
+toType64' (VectorScalarType _) t = t
+
+fromType64' :: ScalarType e -> Type64 e -> e
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    t = fromIntegral t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt8)))   t = t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt16)))  t = t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt32)))  t = t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeInt64)))  t = t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord)))   t = fromIntegral t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord8)))  t = t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord16))) t = t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord32))) t = t
+fromType64' (SingleScalarType (NumSingleType (IntegralNumType TypeWord64))) t = t
+fromType64' (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   t = t
+fromType64' (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  t = t
+fromType64' (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) t = t
+fromType64' (VectorScalarType _) t = t
 
 type TFAll = '[Complex Double,
                Complex Float,
@@ -49,6 +99,7 @@ type TFAll = '[Complex Double,
                Float]
 
 type TFNum    = TFAll TF.\\ '[Bool]
+type TFNum'   = TFNum TF.\\ '[Word8]
 type TFOrd    = TFNum TF.\\ '[Complex Double, Complex Float]
 type TFInt    = TFOrd TF.\\ '[Double, Float]
 
@@ -72,6 +123,21 @@ tfNumDict (IntegralNumType TypeWord64) = OneOfDict
 tfNumDict (FloatingNumType TypeHalf)   = error "not a TF num type"
 tfNumDict (FloatingNumType TypeFloat)  = OneOfDict
 tfNumDict (FloatingNumType TypeDouble) = OneOfDict
+
+tfNum'Dict :: NumType a -> OneOfDict TFNum' a
+tfNum'Dict (IntegralNumType TypeInt)    = OneOfDict
+tfNum'Dict (IntegralNumType TypeInt8)   = OneOfDict
+tfNum'Dict (IntegralNumType TypeInt16)  = OneOfDict
+tfNum'Dict (IntegralNumType TypeInt32)  = OneOfDict
+tfNum'Dict (IntegralNumType TypeInt64)  = OneOfDict
+tfNum'Dict (IntegralNumType TypeWord)   = OneOfDict
+tfNum'Dict (IntegralNumType TypeWord8)  = error "not a TF num type"
+tfNum'Dict (IntegralNumType TypeWord16) = OneOfDict
+tfNum'Dict (IntegralNumType TypeWord32) = OneOfDict
+tfNum'Dict (IntegralNumType TypeWord64) = OneOfDict
+tfNum'Dict (FloatingNumType TypeHalf)   = error "not a TF num type"
+tfNum'Dict (FloatingNumType TypeFloat)  = OneOfDict
+tfNum'Dict (FloatingNumType TypeDouble) = OneOfDict
 
 tfOrdDict :: SingleType a -> OneOfDict TFOrd a
 tfOrdDict (NumSingleType (IntegralNumType TypeInt))    = OneOfDict

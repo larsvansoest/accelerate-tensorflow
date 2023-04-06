@@ -42,7 +42,7 @@ import Data.Array.Accelerate.AST.Schedule
 import Data.Array.Accelerate.Representation.Type
     ( Distributes(reprIsSingle), TupR(..), TypeR, mapTupR )
 import Data.Accelerate.TensorFlow.Type
-    ( tfTensorTypeDict, TensorTypeDict(..), TensorType, VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict )
+    ( tfTensorTypeDict, TensorTypeDict(..), TensorType, VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict, toType64, toType64', fromType64' )
 import Data.IORef ( IORef, newIORef, readIORef, writeIORef )
 import Data.Array.Accelerate.Type ( ScalarType )
 import Data.Array.Accelerate.Array.Buffer
@@ -79,6 +79,7 @@ import Data.Array.Accelerate.Interpreter
     ( evalExpM, toBool, EvalArrayInstr(EvalArrayInstr) )
 import Data.Array.Accelerate.Pretty.Schedule ( PrettySchedule )
 import Data.Accelerate.TensorFlow.Operation ( TensorOp )
+import Unsafe.Coerce (unsafeCoerce)
 
 -- detect copy implementeren voor het versimpelen voor programma's
 data TensorFlow where
@@ -117,7 +118,7 @@ data TensorValue a where
 
 data TensorElement a where
   Scalar :: TypeR a -> a -> TensorElement a
-  Tensor :: VectorType a => ScalarType a -> TF.Shape -> IORef (TensorValue (Type64 a)) -> TensorElement (Buffer a)
+  Tensor :: VectorType (Type64 a) => ScalarType a -> TF.Shape -> IORef (TensorValue (Type64 a)) -> TensorElement (Buffer a)
 
 type TensorElements = TupR TensorElement
 
@@ -155,11 +156,15 @@ executeSeqSchedule env (Alloc shR st vars)
   ref <- liftIO $ newIORef Nil
   return $ TupRsingle $ Tensor st sh ref
 
-executeSeqSchedule _ (Use st n buffer)
+executeSeqSchedule _ (Use (st :: ScalarType e) n buffer)
   | VectorTypeDict <- tfVectorTypeDict st
   = do
   let sh = TF.Shape [fromIntegral n]
-  let build = TF.constant sh $ bufferToList st n buffer
+  let cb :: Buffer (Type64 e)
+      cb = unsafeCoerce buffer
+  let list :: [Type64 e]
+      list = bufferToList (toType64 st) n cb
+  let build = TF.constant sh list
   ref <- liftIO $ newIORef $ Build build
   return $ TupRsingle $ Tensor st sh ref
 
@@ -167,7 +172,7 @@ executeSeqSchedule env (Unit (Var st idx))
   | (Scalar _ t) <- prj' idx env
   , VectorTypeDict <- tfVectorTypeDict st
   = do let sh = TF.Shape [1]
-       ref <- liftIO $ newIORef $ Build $ TF.constant sh [t]
+       ref <- liftIO $ newIORef $ Build $ TF.constant sh [toType64' st t]
        return $ TupRsingle $ Tensor st sh ref
 executeSeqSchedule _ (Unit _) = error "impossible"
 
@@ -184,74 +189,67 @@ executeOpenKernelFun env' env (KernelFunLam (KernelArgRbuffer _ _) fun) ((SArgBu
 executeOpenKernelFun env' _ (KernelFunBody kernel) ArgsNil                                                    = executeKernel env' kernel
 
 executeKernel :: TensorEnv env -> TensorKernel env -> TF.Session (TensorElements ())
-executeKernel env (TensorConstant s (Var _ idx))
+executeKernel env (TensorConstant st s (Var _ idx))
   | Tensor _ (TF.Shape sh) ref <- prj' idx env
   = do
-  liftIO $ writeIORef ref $ Build $ TF.fill (TF.vector sh) (TF.scalar s)
+  let build = Build $ TF.fill (TF.vector sh) (TF.scalar (toType64' st s))
+  liftIO $ writeIORef ref build
   return TupRunit
-executeKernel env (TensorId (Var _ inIdx) (Var _ outIdx))                          = executeUnaryKernel1 env inIdx outIdx id
+executeKernel env (TensorId (Var _ inIdx) (Var _ outIdx))                                    = executeUnaryKernel1 env inIdx outIdx id
+executeKernel env (TensorSelect (Var _ inIdx1) (Var _ inIdx2) (Var _ inIdx3) (Var _ outIdx)) = executeTernaryKernel1 env inIdx1 inIdx2 inIdx3 outIdx $ \x y z -> TF.select (TF.cast x) y z
 
-executeKernel env (TensorAdd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))         = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.add
-executeKernel env (TensorMul (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))         = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.mul
-executeKernel env (TensorSub (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))         = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.sub
-executeKernel env (TensorNeg (Var _ inIdx) (Var _ outIdx))                         = executeUnaryKernel1 env inIdx outIdx TF.neg
-executeKernel env (TensorAbs (Var _ inIdx) (Var _ outIdx))                         = executeUnaryKernel1 env inIdx outIdx TF.abs
-executeKernel env (TensorSign (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.sign
+executeKernel env (TensorAdd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.add
+executeKernel env (TensorMul (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.mul
+executeKernel env (TensorSub (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.sub
+executeKernel env (TensorNeg (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel1 env inIdx outIdx TF.neg
+executeKernel env (TensorAbs (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel1 env inIdx outIdx TF.abs
+executeKernel env (TensorSign (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.sign
 
-executeKernel env (TensorTruncateDiv (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx)) = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.truncateDiv
-executeKernel env (TensorTruncateMod (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx)) = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.truncateMod
-executeKernel env (TensorRealDiv (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))     = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.realDiv
+executeKernel env (TensorTruncateDiv (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))           = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.truncateDiv
+executeKernel env (TensorTruncateMod (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))           = undefined -- executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.truncateMod
+executeKernel env (TensorRealDiv (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))               = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.realDiv
 
-executeKernel env (TensorBitwiseAnd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))  = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.bitwiseAnd
-executeKernel env (TensorBitwiseOr (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.bitwiseOr
-executeKernel env (TensorBitwiseXor (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))  = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.bitwiseXor
-executeKernel env (TensorInvert (Var _ inIdx) (Var _ outIdx))                      = executeUnaryKernel1 env inIdx outIdx TF.invert
+executeKernel env (TensorBitwiseAnd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))            = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.bitwiseAnd
+executeKernel env (TensorBitwiseOr (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))             = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.bitwiseOr
+executeKernel env (TensorBitwiseXor (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))            = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.bitwiseXor
+executeKernel env (TensorInvert (Var _ inIdx) (Var _ outIdx))                                = executeUnaryKernel1 env inIdx outIdx TF.invert
 
-executeKernel env (TensorReciprocal (Var _ inIdx) (Var _ outIdx))                  = executeUnaryKernel1 env inIdx outIdx TF.reciprocal
-executeKernel env (TensorSin (Var _ inIdx) (Var _ outIdx))                         = executeUnaryKernel1 env inIdx outIdx TF.sin
-executeKernel env (TensorCos (Var _ inIdx) (Var _ outIdx))                         = executeUnaryKernel1 env inIdx outIdx TF.cos
-executeKernel env (TensorTan (Var _ inIdx) (Var _ outIdx))                         = executeUnaryKernel1 env inIdx outIdx TF.tan
-executeKernel env (TensorAsin (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.asin
-executeKernel env (TensorAcos (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.acos
-executeKernel env (TensorAtan (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.atan
-executeKernel env (TensorSinh (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.sinh
-executeKernel env (TensorCosh (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.cosh
-executeKernel env (TensorTanh (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.tanh
-executeKernel env (TensorAsinh (Var _ inIdx) (Var _ outIdx))                       = executeUnaryKernel1 env inIdx outIdx TF.asinh
-executeKernel env (TensorAcosh (Var _ inIdx) (Var _ outIdx))                       = executeUnaryKernel1 env inIdx outIdx TF.acosh
-executeKernel env (TensorAtanh (Var _ inIdx) (Var _ outIdx))                       = executeUnaryKernel1 env inIdx outIdx TF.atanh
-executeKernel env (TensorExp (Var _ inIdx) (Var _ outIdx))                         = executeUnaryKernel1 env inIdx outIdx TF.exp
-executeKernel env (TensorSqrt (Var _ inIdx) (Var _ outIdx))                        = executeUnaryKernel1 env inIdx outIdx TF.sqrt
-executeKernel env (TensorLog (Var _ inIdx) (Var _ outIdx))                         = executeUnaryKernel1 env inIdx outIdx TF.log
-executeKernel env (TensorLog1p (Var _ inIdx) (Var _ outIdx))                       = executeUnaryKernel1 env inIdx outIdx TF.log1p
+executeKernel env (TensorReciprocal (Var _ inIdx) (Var _ outIdx))                            = executeUnaryKernel1 env inIdx outIdx TF.reciprocal
+executeKernel env (TensorSin (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel1 env inIdx outIdx TF.sin
+executeKernel env (TensorCos (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel1 env inIdx outIdx TF.cos
+executeKernel env (TensorTan (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel1 env inIdx outIdx TF.tan
+executeKernel env (TensorAsin (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.asin
+executeKernel env (TensorAcos (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.acos
+executeKernel env (TensorAtan (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.atan
+executeKernel env (TensorSinh (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.sinh
+executeKernel env (TensorCosh (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.cosh
+executeKernel env (TensorTanh (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.tanh
+executeKernel env (TensorAsinh (Var _ inIdx) (Var _ outIdx))                                 = executeUnaryKernel1 env inIdx outIdx TF.asinh
+executeKernel env (TensorAcosh (Var _ inIdx) (Var _ outIdx))                                 = executeUnaryKernel1 env inIdx outIdx TF.acosh
+executeKernel env (TensorAtanh (Var _ inIdx) (Var _ outIdx))                                 = executeUnaryKernel1 env inIdx outIdx TF.atanh
+executeKernel env (TensorExp (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel1 env inIdx outIdx TF.exp
+executeKernel env (TensorSqrt (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.sqrt
+executeKernel env (TensorLog (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel1 env inIdx outIdx TF.log
+executeKernel env (TensorLog1p (Var _ inIdx) (Var _ outIdx))                                 = executeUnaryKernel1 env inIdx outIdx TF.log1p
 
-executeKernel env (TensorAtan2 (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))       = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.atan2
+executeKernel env (TensorAtan2 (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                 = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.atan2
 
-executeKernel env (TensorLess (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))        = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.less x y)
-executeKernel env (TensorGreater (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))     = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.greater x y)
-executeKernel env (TensorLessEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.lessEqual x y)
-executeKernel env (TensorGreaterEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))= executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.greaterEqual x y)
-executeKernel env (TensorEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))       = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.equal x y)
-executeKernel env (TensorNotEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))    = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.notEqual x y)
-executeKernel env (TensorMaximum (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))     = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.maximum
-executeKernel env (TensorMinimum (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))     = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.minimum
+executeKernel env (TensorLess (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                  = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.less x y)
+executeKernel env (TensorGreater (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))               = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.greater x y)
+executeKernel env (TensorLessEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))             = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.lessEqual x y)
+executeKernel env (TensorGreaterEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))          = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.greaterEqual x y)
+executeKernel env (TensorEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                 = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.equal x y)
+executeKernel env (TensorNotEqual (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))              = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.notEqual x y)
+executeKernel env (TensorMaximum (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))               = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.maximum
+executeKernel env (TensorMinimum (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))               = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.minimum
 
-executeKernel env (TensorLogicalAnd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx)) = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.logicalAnd (TF.cast x) (TF.cast y))
-executeKernel env (TensorLogicalOr (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))  = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.logicalOr (TF.cast x) (TF.cast y))
-executeKernel env (TensorLogicalNot (Var _ inIdx) (Var _ outIdx))                 = executeUnaryKernel1 env inIdx outIdx $ \x -> TF.cast (TF.logicalNot (TF.cast x))
+executeKernel env (TensorLogicalAnd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))            = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.logicalAnd (TF.cast x) (TF.cast y))
+executeKernel env (TensorLogicalOr (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))             = executeBinaryKernel1 env inIdx1 inIdx2 outIdx $ \x y -> TF.cast (TF.logicalOr (TF.cast x) (TF.cast y))
+executeKernel env (TensorLogicalNot (Var _ inIdx) (Var _ outIdx))                            = executeUnaryKernel1 env inIdx outIdx $ \x -> TF.cast (TF.logicalNot (TF.cast x))
 
-executeKernel env (TensorCast (Var _ inIdx) (Var _ outIdx))                       = executeUnaryKernel1 env inIdx outIdx TF.cast
+executeKernel env (TensorCast (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.cast
 
 -- bij execute: op elk moment je een tensor gebruikt, moet je checken of hij de goede shape heeft. Zo nee, dan moet je een reshape uitvoeren.
-
-executeKernel env (TensorCond t (Var _ condIdx) inVars1 inVars2 outVars)
-  | Tensor _ _ inBoolRef1 <- prj' condIdx env
-  = do
-    liftIO $ runTensorRef inBoolRef1
-    Vector boolVec <- liftIO $ readIORef inBoolRef1
-    let pathVars = if Prelude.all ((Prelude.== True) . toBool) (S.toList boolVec) then inVars1 else inVars2 -- omzetten naar array level
-    liftIO $ writeVars t env outVars pathVars
-    return TupRunit
 
 executeKernel _ _ = error "impossible"
 
@@ -286,7 +284,7 @@ executeUnaryKernel1 env inIdx outIdx tfOp
     return TupRunit
 executeUnaryKernel1 _ _ _ _ = error "impossible"
 
-executeBinaryKernel1 :: TensorEnv env -> Idx env (Buffer a) -> Idx env (Buffer a) -> Idx env (Buffer b) -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b)) -> TF.Session (TensorElements ())
+executeBinaryKernel1 :: TensorEnv env -> Idx env (Buffer a) -> Idx env (Buffer b) -> Idx env (Buffer c) -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b) -> TF.Tensor TF.Build (Type64 c)) -> TF.Session (TensorElements ())
 executeBinaryKernel1 env inIdx1 inIdx2 outIdx tfOp
   | Tensor _ sh1 inRef1 <- prj' inIdx1 env
   , Tensor _ sh2 inRef2 <- prj' inIdx2 env
@@ -300,6 +298,24 @@ executeBinaryKernel1 env inIdx1 inIdx2 outIdx tfOp
     liftIO $ writeIORef outRef $ Build $ tfOp inTensor1 inTensor2
     return TupRunit
 executeBinaryKernel1 _ _ _ _ _ = error "impossible"
+
+executeTernaryKernel1 :: TensorEnv env -> Idx env (Buffer a) -> Idx env (Buffer b) -> Idx env (Buffer c) -> Idx env (Buffer d) -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b) -> TF.Tensor TF.Build (Type64 c) -> TF.Tensor TF.Build (Type64 d)) -> TF.Session (TensorElements ())
+executeTernaryKernel1 env inIdx1 inIdx2 inIdx3 outIdx tfOp
+  | Tensor _ sh1 inRef1 <- prj' inIdx1 env
+  , Tensor _ sh2 inRef2 <- prj' inIdx2 env
+  , Tensor _ sh3 inRef3 <- prj' inIdx3 env
+  , Tensor _ _ outRef   <- prj' outIdx env
+  = do
+    inValue1 <- liftIO $ readIORef inRef1
+    inValue2 <- liftIO $ readIORef inRef2
+    inValue3 <- liftIO $ readIORef inRef3
+    let inTensor1 = buildTensorValue sh1 inValue1
+    let inTensor2 = buildTensorValue sh2 inValue2
+    let inTensor3 = buildTensorValue sh3 inValue3
+
+    liftIO $ writeIORef outRef $ Build $ tfOp inTensor1 inTensor2 inTensor3
+    return TupRunit
+executeTernaryKernel1 _ _ _ _ _ _ = error "impossible"
 
 getShape :: TensorEnv env -> ShapeR sh -> ExpVars env sh -> IO TF.Shape
 getShape env shR vars = do
@@ -349,27 +365,24 @@ toTensorData t sh n buffer = do
 evalArrayInstr :: TensorEnv env -> ArrayInstr env (s -> t) -> s -> TF.SessionT IO t
 evalArrayInstr env (Index (Var _ idx)) s     = case prj' idx env of
   Scalar _ _ -> error "impossible"
-  Tensor _ _ ref -> do
+  Tensor st _ ref -> do
     tensorV <- liftIO $ readIORef ref
     case tensorV of
       Build _ -> undefined
-      Vector vec -> return $ vec S.! s
+      Vector vec -> return $ fromType64' st $ vec S.! s
       Nil -> error "impossible"
 evalArrayInstr env (Parameter (Var _ idx)) _ = case prj' idx env of
   Scalar _ e -> return e
   Tensor {} -> error "impossible"
 
-toBuffer :: VectorType a => ScalarType a -> IORef (TensorValue (Type64 a)) -> IO (Buffer a)
+toBuffer :: forall a. (VectorType (Type64 a)) => ScalarType a -> IORef (TensorValue (Type64 a)) -> IO (Buffer a)
 toBuffer st ref = do
   runTensorRef ref
-  Vector vec <- readIORef ref
+  Vector (vec :: S.Vector (Type64 a)) <- readIORef ref
   let n = S.length vec
-  mutableBuffer <- newBuffer st n
-  writeVectorToBuffer st vec mutableBuffer
+  (mutableBuffer :: MutableBuffer a) <- newBuffer st n
+  liftIO $ S.iforM_ vec (\i a -> writeBuffer st mutableBuffer i (fromType64' st a))
   return $ unsafeFreezeBuffer mutableBuffer
-
-writeVectorToBuffer :: VectorType a => ScalarType a -> S.Vector a -> MutableBuffer a -> IO ()
-writeVectorToBuffer st vec buffer = S.iforM_ vec (writeBuffer st buffer)
 
 -- | convert a tensorvalue to a build tensor
 buildTensorValue :: VectorType a => TF.Shape -> TensorValue a -> TF.Tensor TF.Build a
@@ -393,7 +406,7 @@ returnTensorElements (TupRpair t t') = do elems  <- returnTensorElements t
                                           elems' <- returnTensorElements t'
                                           return (elems, elems')
 
-runTensorRef :: IORef (TensorValue a) -> IO ()
+runTensorRef :: VectorType a => IORef (TensorValue a) -> IO ()
 runTensorRef ref = do
   value <- readIORef ref
   case value of
