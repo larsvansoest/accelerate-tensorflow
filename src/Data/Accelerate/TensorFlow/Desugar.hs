@@ -15,7 +15,7 @@ import Data.Array.Accelerate.AST.Operation
       PreArgs((:>:), ArgsNil),
       ExpVars,
       PreOpenAcc(Compute, Exec, Return, Alet),
-      GroundR(GroundRscalar),
+      GroundR(GroundRscalar, GroundRbuffer),
       Modifier(In, Mut, Out),
       PreOpenExp(..),
       PreOpenFun(Body, Lam),
@@ -24,7 +24,7 @@ import Data.Array.Accelerate.AST.Operation
       OperationAcc,
       Out,
       In,
-      Arg(ArgFun, ArgArray) )
+      Arg(ArgFun, ArgArray, ArgVar), varType, paramsIn )
 import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(LeftHandSideWildcard, LeftHandSideSingle) )
 import Data.Array.Accelerate.Backend
@@ -43,7 +43,7 @@ import Data.Array.Accelerate.Representation.Type
     ( Distributes(reprIsSingle),
       Distribute,
       TupR(TupRpair, TupRunit, TupRsingle),
-      TypeR )
+      TypeR, mapTupR )
 import Data.Array.Accelerate.Trafo.Var
     ( declareVars, DeclareVars(DeclareVars) )
 import Data.Array.Accelerate.AST.Idx ( Idx(ZeroIdx, SuccIdx) )
@@ -69,31 +69,41 @@ instance DesugarAcc TensorOp where
   mkMap _ _ _ = error "impossible"
 
   mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb)
-    | DeclareVars lhs w k       <- declareVars $ buffersR (TupRsingle scalarTypeInt)
-    , DeclareVars lhs' w' k'    <- declareVars $ buffersR (shapeType sh)
-    , DeclareVars lhs'' w'' k'' <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
-    = -- 1) Create a Tensor of shape sh with only ones
-      aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds gv)) $
+    | DeclareVars lhs w k          <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+    , DeclareVars lhs' w' k'       <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+    , DeclareVars lhs'' w'' k''    <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+    , DeclareVars lhs''' w''' k''' <- declareVars $ buffersR $ shapeType sh
+    = aletUnique lhs (Compute (ShapeSize sh (paramsIn' $ fromGrounds gv))) $
+      -- 1) Create a Tensor of flattened shape sh with only ones
+      aletUnique lhs' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars w $ fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
         (TConstant scalarTypeInt 1)
-        (ArgArray Out (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars w gv) (k weakenId) :>: ArgsNil)
+        (ArgArray Out (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w' .> w) gv) (k' weakenId) :>: ArgsNil)
       ) $
-      -- 2) Obtain a 1D array of indexes (tf.where returns list of indices pointing to values > 0)
-      aletUnique lhs' (desugarAlloc (ArrayR sh (shapeType sh)) (weakenVars w $ fromGrounds gv)) $
-      aletUnique lhs'' (Compute (ShapeSize sh (paramsIn' $ weakenVars (w' .> w) $ fromGrounds gv))) $
+      -- 2) Obtain a tensor of indices (tf.where returns list of indices pointing to values > 0)
+      aletUnique lhs'' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w' .> w) $ fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
-        (TWhere scalarTypeInt)
-        (ArgArray In (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w'' .> w' .> w) gv) (k (w'' .> w')) :>:
-         ArgArray Out (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w'') :>:
+        TWhere
+        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k (w'' .> w'))) (k' w'') :>:
+         ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k (w'' .> w'))) (k'' weakenId) :>:
          ArgsNil)
+      ) $
+      -- 3) Convert 1d indices to multidimensional indices
+      aletUnique lhs''' (desugarAlloc (ArrayR dim1 (shapeType sh)) (fromGrounds $ TupRpair TupRunit (k (w'' .> w')))) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (mkMap -- vraag woensdag: dit pakt alleen het eerste element, waarom?
+        (ArgFun $ Lam (LeftHandSideSingle scalarTypeInt) $ Body (FromIndex sh (paramsIn' $ fromGrounds $ weakenVars (w''' .> w'' .> w' .> w) gv) (Evar (Var scalarTypeInt ZeroIdx))))
+        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k'' w'''))
+        (ArgArray Out (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k''' weakenId))
       )
-      -- 3) Apply map on array of indices.
+      -- 4) Apply f to the indices
       (mkMap
-        (weaken (w'' .> w' .> w) f)
-        (ArgArray In (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k'' weakenId)) (k' w''))
-        (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k'' weakenId)) (weakenVars (w'' .> w' .> w) gvb)))
+        (weaken (w''' .> w'' .> w' .> w) f)
+        (ArgArray In (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k''' weakenId))
+        (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (weakenVars (w''' .> w'' .> w' .> w) gvb))
+      )
 
   mkPermute
     (ArgFun comb)
@@ -181,13 +191,13 @@ mkMapF env (Let elhs exp1 exp2) aOut@(ArgArray _ (ArrayR sh _) gv _)
      (weakenArrayInstr w exp2)
      (weaken w aOut)
 
-mkMapF env (Evar (Var s idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR _)))
-  | Refl <- reprIsSingle @ScalarType @t @Buffer s
-  , OneOfDict <- tfAllDict s
+mkMapF env (Evar (Var st idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR _)))
+  | Refl <- reprIsSingle @ScalarType @t @Buffer st
+  , OneOfDict <- tfAllDict st
   = let (BIdx idx') = prj' idx env
         gvb'        = TupRsingle (Var groundR idx')
     in  Exec
-          (TId s)
+          (TId st)
           (
             ArgArray In arrayR gv gvb' :>:
             ArgArray Out arrayR gv gvb :>:
@@ -241,30 +251,42 @@ mkMapF env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
         ArgsNil
       )
     )
+mkMapF env (Cond cond exp1 exp2) _ = error "here"
 
 mkMapF _ Nil _ = Return TupRunit
 
-mkMapF env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t) gv gvb)
-  | a <- expType exp
-  , DeclareVars lhs w k <- declareVars $ buffersR a
-  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
+mkMapF env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t@(TupRsingle st)) gv gvb)
+  | Refl <- reprIsSingle @ScalarType @t @Buffer st
+  , OneOfDict <- tfAllDict st
+  , i <- expType exp
+  , DeclareVars lhs w k <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+  , DeclareVars lhs' w' k' <- declareVars $ buffersR i
+  =  -- To apply gather to 1d array, calculate the dim1 size
+    aletUnique lhs (Compute (ShapeSize sh (paramsIn' $ fromGrounds gv))) $
+    aletUnique lhs' (desugarAlloc (ArrayR sh i) (weakenVars w $ fromGrounds gv)) $
     Alet (LeftHandSideWildcard TupRunit) TupRunit
-    (mkMapF
-      (weakenEnv w env)
-      (weakenArrayInstr w exp)
-      (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId))
-    )
-    (Exec 
-      TGather 
+    (mkMapF (weakenEnv (w' .> w) env) (weakenArrayInstr (w' .> w) exp) (ArgArray Out (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId))) 
+    (Exec
+      (TGather st)
       (
-        ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>:
-        ArgArray In (ArrayR sh a) (weakenVars w gv) (weaken w $ TupRsingle var) :>:
-        ArgArray Out (ArrayR sh a) (weakenVars w gv) (weakenVars w gvb) :>:
+        ArgArray In (ArrayR dim1 t) (TupRpair TupRunit (k w')) (TupRsingle (weaken (w' .> w) var)) :>:
+        ArgArray In (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId) :>:
+        ArgArray Out (ArrayR sh t) (weakenVars (w' .> w) gv) (weakenVars (w' .> w) gvb) :>:
         ArgsNil
       )
     )
+mkMapF env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t) gv gvb) = error "here"
 
-mkMapF env (ArrayInstr (Parameter (Var s idx)) exp) (ArgArray _ (ArrayR sh t) gv gvb) = undefined
+mkMapF _ (ArrayInstr (Parameter var@(Var st _)) Nil) aOut
+  | OneOfDict <- tfAllDict st
+  = Exec
+      (TVar st)
+      (
+        ArgVar (TupRsingle var) :>:
+        aOut :>:
+        ArgsNil
+      )
+mkMapF _ (ArrayInstr (Parameter var@(Var st _)) _) aOut = error "here"
 
 mkMapF _ (Foreign _ _ _ _) _ = undefined
 mkMapF _ (VecPack _ _) _ = undefined
@@ -290,11 +312,11 @@ mkMapPrimAppF (PrimAbs nt)  | OneOfDict <- tfNum'Dict nt = mkMapPrimAppF' $ TAbs
 mkMapPrimAppF (PrimSig nt)  | OneOfDict <- tfNum'Dict nt = mkMapPrimAppF' $ TSign (SingleScalarType (NumSingleType nt))
 
 mkMapPrimAppF (PrimQuot it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkMapPrimAppF' $ TTruncateDiv (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkMapPrimAppF (PrimRem it)  | OneOfDict <- tfNumDict (IntegralNumType it) = mkMapPrimAppF' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
+mkMapPrimAppF (PrimRem it)  | OneOfDict <- tfModDict it = mkMapPrimAppF' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
 mkMapPrimAppF (PrimQuotRem it) = mkMapPrimAppF2' (PrimQuot it) (PrimRem it)
 
 mkMapPrimAppF (PrimIDiv it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkMapPrimAppF' $ TRealDiv (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkMapPrimAppF (PrimMod it)  | OneOfDict <- tfNumDict (IntegralNumType it) = mkMapPrimAppF' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
+mkMapPrimAppF (PrimMod it)  | OneOfDict <- tfModDict it = mkMapPrimAppF' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
 
 mkMapPrimAppF (PrimDivMod it) = mkMapPrimAppF2' (PrimIDiv it) (PrimMod it)
  
@@ -429,7 +451,6 @@ fromIndex (ShapeRsnoc shr) (TupRpair sh (TupRsingle sz)) (TupRsingle i)
       ShapeRz -> Evar i
       _       -> PrimApp (PrimRem TypeInt) (Pair (Evar i) (Evar sz))
     )
-
 fromIndex _ _ _              = error "impossible"
 
 newtype BufferIdx benv a = BIdx (Idx benv (Buffer a))

@@ -10,7 +10,7 @@
 
 module Data.Accelerate.TensorFlow.Kernel where
 import Data.Accelerate.TensorFlow.Type
-    ( TFOrd, OneOf, TFNum, TFNum', TFAll, TFFloat, TensorType, TFInt )
+    ( TFOrd, OneOf, TFNum, TFNum', TFAll, TFFloat, TensorType, TFInt, TFMod )
 import Data.Array.Accelerate.AST.Schedule.Uniform
     ( PrimBool,
       Var(Var),
@@ -18,14 +18,14 @@ import Data.Array.Accelerate.AST.Schedule.Uniform
       GroundVars,
       Out,
       In,
-      Arg(ArgArray),
+      Arg(..),
       NFData'(..),
       Args,
       BaseVars,
       BaseVar,
       Cluster,
       BaseR(BaseRground),
-      AccessGroundR )
+      AccessGroundR, ExpVar, GroundR (GroundRscalar) )
 import Data.Array.Accelerate.Array.Buffer ( Buffer, Buffers )
 import Data.Array.Accelerate.Representation.Type
     ( Distributes(reprIsSingle),
@@ -47,13 +47,17 @@ import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(LeftHandSidePair, LeftHandSideWildcard) )
 import Data.Array.Accelerate.Representation.Array
     ( ArrayR(ArrayR) )
-import Data.Array.Accelerate.Type ( scalarTypeWord8, ScalarType )
+import Data.Array.Accelerate.Type ( scalarTypeWord8, ScalarType, scalarTypeInt )
+import Data.Array.Accelerate.Representation.Shape (shapeType, DIM1, ShapeR (ShapeRz, ShapeRsnoc))
 
 
 data TensorKernel env where
   TensorConstant :: TensorType a => ScalarType a -> a -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorVar      :: TensorType a => ScalarType a -> BaseVar env a -> BaseVar env (Buffer a) -> TensorKernel env
   TensorId       :: OneOf TFAll a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorSelect   :: OneOf TFAll a => BaseVar env (Buffer PrimBool) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorWhere    :: BaseVar env (Buffer Int) -> BaseVar env (Buffer Int) -> TensorKernel env
+  TensorGather   :: OneOf TFAll a => BaseVar env (Buffer a) -> BaseVar env (Buffer Int) -> BaseVar env (Buffer a) -> TensorKernel env
 
   -- operators from Num
   TensorAdd  :: OneOf TFNum  a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
@@ -65,7 +69,7 @@ data TensorKernel env where
 
   -- operators from Integral
   TensorTruncateDiv :: OneOf TFNum a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
-  TensorTruncateMod :: OneOf TFNum a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorTruncateMod :: OneOf TFMod a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorRealDiv     :: OneOf TFNum a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
 
   -- operators from Bits & FiniteBits
@@ -73,7 +77,7 @@ data TensorKernel env where
   TensorBitwiseOr  :: OneOf TFInt a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorBitwiseXor :: OneOf TFInt a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorInvert     :: OneOf TFInt a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
-  
+
   -- operators from Fractional and Floating
   TensorReciprocal :: OneOf TFFloat a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorSin        :: OneOf TFFloat a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
@@ -94,7 +98,7 @@ data TensorKernel env where
   TensorPow        :: OneOf TFFloat a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorLog1p      :: OneOf TFFloat a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorAtan2      :: OneOf TFFloat a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
-  
+
   -- relational and equality operators
   TensorLess         :: OneOf TFOrd a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer PrimBool) -> TensorKernel env
   TensorGreater      :: OneOf TFOrd a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer PrimBool) -> TensorKernel env
@@ -139,11 +143,22 @@ instance PrettyKernel TensorKernel where
   prettyKernel = PrettyKernelBody True $ \_ _ -> ""
 
 compileOperation :: TensorOp args -> Args env args -> TensorKernel env
-compileOperation (TConstant stIn s) (argIn :>: _)              = compileNullaryOperation1 stIn argIn (TensorConstant stIn s)
+compileOperation (TConstant stIn s) (argOut :>: _)                            = compileNullaryOperation1 stIn argOut (TensorConstant stIn s)
+compileOperation (TVar (stIn :: ScalarType a)) (ArgVar (TupRsingle (Var _ idx)) :>: (ArgArray _ (ArrayR _ a) _ gvbOut) :>: _) 
+  | Refl <- reprIsSingle @ScalarType @a @Buffer stIn 
+  = TensorVar stIn (Var (BaseRground (GroundRscalar stIn)) idx) (groundToBase a gvbOut)  --Var (BaseRground groundR) idx
+compileOperation (TVar _) _          = error "impossible"
+
 compileOperation (TId stIn) (argIn :>: argOut :>: _)           = compileUnaryOperation1 stIn stIn argIn argOut TensorId
 
 compileOperation (TSelect stIn) (argIn :>: argOut :>: _)       = compileTernaryOperation1 scalarTypeWord8 stIn stIn stIn argIn argOut TensorSelect
-        
+
+compileOperation TWhere (argIn :>: argOut :>: _)               = compileUnaryOperation1 scalarTypeInt scalarTypeInt argIn argOut TensorWhere
+
+compileOperation (TGather (stIn :: ScalarType a)) (ArgArray _ (ArrayR _ a) _ gvbIn1 :>: ArgArray _ (ArrayR _ b) _ gvbIn2 :>: ArgArray _ (ArrayR _ _) _ gvbOut :>: _)
+  | Refl <- reprIsSingle @ScalarType @a @Buffer stIn  
+  = TensorGather (groundToBase a gvbIn1) (groundToBase b gvbIn2) (groundToBase a gvbOut)
+
 compileOperation (TAdd stIn) (argIn :>: argOut :>: _)          = compileBinaryOperation1 stIn stIn stIn argIn argOut TensorAdd
 compileOperation (TMul stIn) (argIn :>: argOut :>: _)          = compileBinaryOperation1 stIn stIn stIn argIn argOut TensorMul
 compileOperation (TSub stIn) (argIn :>: argOut :>: _)          = compileBinaryOperation1 stIn stIn stIn argIn argOut TensorSub
@@ -195,7 +210,6 @@ compileOperation TLogicalNot (argIn :>: argOut :>: _)          = compileUnaryOpe
 compileOperation (TCast stIn stOut) (argIn :>: argOut :>: _) = compileUnaryOperation1 stIn stOut argIn argOut TensorCast
 
 compileOperation (TPow stIn) (argIn :>: argOut :>: _) = compileBinaryOperation1 stIn stIn stIn argIn argOut TensorPow
-compileOperation (TWhere _) _                         = undefined
 compileOperation (TTensorScatter _) _                 = undefined
 compileOperation (TBooleanMask _) _                   = undefined
 

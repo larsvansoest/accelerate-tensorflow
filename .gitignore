@@ -3,3 +3,4 @@ template-accelerate.cabal
 *~
 gurobi.log
 extra-deps/tf*
+test.log

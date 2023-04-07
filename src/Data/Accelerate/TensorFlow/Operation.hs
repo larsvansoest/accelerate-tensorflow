@@ -11,10 +11,10 @@
 module Data.Accelerate.TensorFlow.Operation where
 
 import Data.Accelerate.TensorFlow.Type
-    ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum' )
+    ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod )
 import Data.Array.Accelerate.Type ( ScalarType )
 import Data.Array.Accelerate.AST.Operation
-    ( PrimBool, Mut, Out, In, NFData'(..), Var' )
+    ( PrimBool, Mut, Out, In, NFData'(..), Var', ExpVar )
 import Data.Array.Accelerate
     ( MakesILP(..),
       ShrinkArg(..),
@@ -26,17 +26,20 @@ import Data.Array.Accelerate.Pretty.Exp ( prettyConst, Adoc )
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Labels (LabelledArg(..))
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
     ( LabelledArgOp(LOp) )
-import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarType, encodeScalarConst, Builder)
+import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarType, encodeScalarConst, Builder, encodeExpVar)
 import Prettyprinter ( viaShow, vsep )
 import Data.Array.Accelerate.Pretty.Type ( prettyScalarType )
 import Data.Array.Accelerate.Representation.Type
-    ( TupR(TupRsingle) )
-import Data.Array.Accelerate.Representation.Shape (DIM1)
+    ( TupR(TupRsingle), TypeR )
+import Data.Array.Accelerate.Representation.Shape (DIM1, ShapeR)
 
 data TensorOp op where
   TConstant :: OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())
+  TVar      :: OneOf TFAll a => ScalarType a -> TensorOp (Var' a -> Out sh a -> ())
   TId       :: OneOf TFAll a => ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
   TSelect   :: OneOf TFAll a => ScalarType a -> TensorOp (In sh (PrimBool, (a, a)) -> Out sh a -> ())
+  TGather   :: OneOf TFAll a => ScalarType a -> TensorOp (In DIM1 a -> In sh Int -> Out sh a -> ())
+  TWhere    :: TensorOp (In DIM1 Int -> Out DIM1 Int -> ())
 
   -- operators from Num
   TAdd  :: OneOf TFNum  a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
@@ -48,7 +51,7 @@ data TensorOp op where
 
   -- operators from Integral
   TTruncateDiv :: OneOf TFNum a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
-  TTruncateMod :: OneOf TFNum a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
+  TTruncateMod :: OneOf TFMod a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
   TRealDiv     :: OneOf TFNum a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
 
   -- operators from Bits & FiniteBits
@@ -95,17 +98,15 @@ data TensorOp op where
 
   TCast :: (TensorType a, TensorType b) => ScalarType a -> ScalarType b -> TensorOp (In sh a -> Out sh b -> ())
 
-  TWhere :: ScalarType a -> TensorOp (In sh a -> Out DIM1 sh -> ())
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
   TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
-  -- TGather :: TensorOp (In sh t -> In sh t -> Out sh t -> ())
-
-  TVar ::  TensorOp (In sh t -> Var' Int -> Out sh t -> ())
 
 instance EncodeOperation TensorOp where
   encodeOperation :: TensorOp t -> Builder
   encodeOperation t = case t of
     TConstant st s -> intHost $(hashQ ("Constant" :: String)) <> encodeScalarConst st s
+    TVar st -> intHost $(hashQ ("Var" :: String)) <> encodeScalarType st
+    TWhere -> intHost $(hashQ ("Where" :: String))
     TId st -> intHost $(hashQ ("Id" :: String)) <> encodeScalarType st
     TSelect st -> intHost $(hashQ ("Select" :: String)) <> encodeScalarType st
     TAdd st -> intHost $(hashQ ("Add" :: String)) <> encodeScalarType st
@@ -116,7 +117,6 @@ instance EncodeOperation TensorOp where
     TSign st -> intHost $(hashQ ("Sign" :: String)) <> encodeScalarType st
     TTruncateDiv st -> intHost $(hashQ ("TruncateDiv" :: String)) <> encodeScalarType st
     TTruncateMod st -> intHost $(hashQ ("TruncateMod" :: String)) <> encodeScalarType st
-    TWhere st -> intHost $(hashQ ("Where" :: String)) <> encodeScalarType st
     TTensorScatter sf -> encodeScatterFun sf
     TBooleanMask st -> intHost $(hashQ ("BooleanMask" :: String)) <> encodeScalarType st
     TReciprocal st -> intHost $(hashQ ("Reciprocal" :: String)) <> encodeScalarType st
@@ -155,12 +155,12 @@ instance EncodeOperation TensorOp where
     TBitwiseXor st -> intHost $(hashQ ("BitwiseXor" :: String)) <> encodeScalarType st
     TInvert st -> intHost $(hashQ ("Invert" :: String)) <> encodeScalarType st
     TCast st1 st2 -> intHost $(hashQ ("Cast" :: String)) <> encodeScalarType st1 <> encodeScalarType st2
+    TGather st -> intHost $(hashQ ("Gather" :: String)) <> encodeScalarType st
 
 instance PrettyOp TensorOp where
   prettyOp :: TensorOp t -> Adoc
-  prettyOp (TConstant s e)    = vsep ["TConst", prettyConst (TupRsingle s) e]
+  prettyOp (TConstant s e)    = vsep ["TConst"]
   prettyOp (TId s)            = vsep ["TId", prettyScalarType s]
-  prettyOp (TWhere s)         = vsep ["TWhere", prettyScalarType s]
   prettyOp (TTensorScatter f) = vsep ["TTensorScatter", viaShow f]
   prettyOp (TBooleanMask s)   = vsep ["TBooleanMask", prettyScalarType s]
   prettyOp _                  = vsep ["pretty me!"]

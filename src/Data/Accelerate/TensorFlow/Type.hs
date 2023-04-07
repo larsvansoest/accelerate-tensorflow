@@ -17,7 +17,7 @@ import Data.Array.Accelerate.Type
       IntegralType(..),
       NumType(..),
       SingleType(..), ScalarType(..) )
-import Unsafe.Coerce (unsafeCoerce)
+
 
 type family Type64 a where
   Type64 Int   = Int64
@@ -102,6 +102,7 @@ type TFNum    = TFAll TF.\\ '[Bool]
 type TFNum'   = TFNum TF.\\ '[Word8]
 type TFOrd    = TFNum TF.\\ '[Complex Double, Complex Float]
 type TFInt    = TFOrd TF.\\ '[Double, Float]
+type TFMod    = '[Int32, Int64, Word16, Double, Float]
 
 type TFFloat = '[Double, Float]
 tfFloatDict :: FloatingType a -> OneOfDict TFFloat a
@@ -123,6 +124,18 @@ tfNumDict (IntegralNumType TypeWord64) = OneOfDict
 tfNumDict (FloatingNumType TypeHalf)   = error "not a TF num type"
 tfNumDict (FloatingNumType TypeFloat)  = OneOfDict
 tfNumDict (FloatingNumType TypeDouble) = OneOfDict
+
+tfModDict :: IntegralType a -> OneOfDict TFMod a
+tfModDict TypeInt    = OneOfDict
+tfModDict TypeInt8   = error "not a TF mod type"
+tfModDict TypeInt16  = error "not a TF mod type"
+tfModDict TypeInt32  = OneOfDict
+tfModDict TypeInt64  = OneOfDict
+tfModDict TypeWord   = OneOfDict
+tfModDict TypeWord8  = error "not a TF mod type"
+tfModDict TypeWord16 = OneOfDict
+tfModDict TypeWord32 = OneOfDict
+tfModDict TypeWord64 = OneOfDict
 
 tfNum'Dict :: NumType a -> OneOfDict TFNum' a
 tfNum'Dict (IntegralNumType TypeInt)    = OneOfDict

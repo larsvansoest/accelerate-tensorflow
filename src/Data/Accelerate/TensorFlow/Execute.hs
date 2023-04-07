@@ -195,8 +195,15 @@ executeKernel env (TensorConstant st s (Var _ idx))
   let build = Build $ TF.fill (TF.vector sh) (TF.scalar (toType64' st s))
   liftIO $ writeIORef ref build
   return TupRunit
+executeKernel env (TensorVar st (Var _ inIdx) outVar)
+  | Scalar _ s <- prj' inIdx env
+  = executeKernel env (TensorConstant st s outVar)
+  
 executeKernel env (TensorId (Var _ inIdx) (Var _ outIdx))                                    = executeUnaryKernel1 env inIdx outIdx id
 executeKernel env (TensorSelect (Var _ inIdx1) (Var _ inIdx2) (Var _ inIdx3) (Var _ outIdx)) = executeTernaryKernel1 env inIdx1 inIdx2 inIdx3 outIdx $ \x y z -> TF.select (TF.cast x) y z
+executeKernel env (TensorWhere (Var _ inIdx) (Var _ outIdx))                                 = executeUnaryKernel1 env inIdx outIdx TF.where'
+executeKernel env (TensorGather (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.gather
+
 
 executeKernel env (TensorAdd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.add
 executeKernel env (TensorMul (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.mul
@@ -206,7 +213,7 @@ executeKernel env (TensorAbs (Var _ inIdx) (Var _ outIdx))                      
 executeKernel env (TensorSign (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.sign
 
 executeKernel env (TensorTruncateDiv (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))           = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.truncateDiv
-executeKernel env (TensorTruncateMod (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))           = undefined -- executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.truncateMod
+executeKernel env (TensorTruncateMod (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))           = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.truncateMod
 executeKernel env (TensorRealDiv (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))               = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.realDiv
 
 executeKernel env (TensorBitwiseAnd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))            = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.bitwiseAnd
@@ -248,8 +255,6 @@ executeKernel env (TensorLogicalOr (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))
 executeKernel env (TensorLogicalNot (Var _ inIdx) (Var _ outIdx))                            = executeUnaryKernel1 env inIdx outIdx $ \x -> TF.cast (TF.logicalNot (TF.cast x))
 
 executeKernel env (TensorCast (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel1 env inIdx outIdx TF.cast
-
--- bij execute: op elk moment je een tensor gebruikt, moet je checken of hij de goede shape heeft. Zo nee, dan moet je een reshape uitvoeren.
 
 executeKernel _ _ = error "impossible"
 

@@ -914,8 +914,8 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
             tRealFrac,
             tRealFloat
           ]
-          where vec1 = fromList (Z:.1) [1] :: Vector Int64
-                vec1' = fromList (Z:.1) [1] :: Vector Float
+          where vec1 = fromList (Z:.10) [1..] :: Vector Int64
+                vec1' = fromList (Z:.10) [1..] :: Vector Float
                 tNum = testGroup "Num"
                   [
                     tPlus,
