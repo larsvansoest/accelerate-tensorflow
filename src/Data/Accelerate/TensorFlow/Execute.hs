@@ -203,7 +203,7 @@ executeKernel env (TensorId (Var _ inIdx) (Var _ outIdx))                       
 executeKernel env (TensorSelect (Var _ inIdx1) (Var _ inIdx2) (Var _ inIdx3) (Var _ outIdx)) = executeTernaryKernel1 env inIdx1 inIdx2 inIdx3 outIdx $ \x y z -> TF.select (TF.cast x) y z
 executeKernel env (TensorWhere (Var _ inIdx) (Var _ outIdx))                                 = executeUnaryKernel1 env inIdx outIdx TF.where'
 executeKernel env (TensorGather (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.gather
-
+executeKernel env (TensorBooleanMask (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))           = executeBinaryKernel1 env inIdx1 inIdx2 outIdx undefined -- Somehow boolean mask is missing!
 
 executeKernel env (TensorAdd (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.add
 executeKernel env (TensorMul (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel1 env inIdx1 inIdx2 outIdx TF.mul

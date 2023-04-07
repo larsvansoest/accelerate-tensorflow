@@ -34,12 +34,13 @@ import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Representation.Shape (DIM1, ShapeR)
 
 data TensorOp op where
-  TConstant :: OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())
-  TVar      :: OneOf TFAll a => ScalarType a -> TensorOp (Var' a -> Out sh a -> ())
-  TId       :: OneOf TFAll a => ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
-  TSelect   :: OneOf TFAll a => ScalarType a -> TensorOp (In sh (PrimBool, (a, a)) -> Out sh a -> ())
-  TGather   :: OneOf TFAll a => ScalarType a -> TensorOp (In DIM1 a -> In sh Int -> Out sh a -> ())
-  TWhere    :: TensorOp (In DIM1 Int -> Out DIM1 Int -> ())
+  TConstant    :: OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())
+  TVar         :: OneOf TFAll a => ScalarType a -> TensorOp (Var' a -> Out sh a -> ())
+  TId          :: OneOf TFAll a => ScalarType a -> TensorOp (In sh a -> Out sh a -> ())
+  TSelect      :: OneOf TFAll a => ScalarType a -> TensorOp (In sh (PrimBool, (a, a)) -> Out sh a -> ())
+  TGather      :: OneOf TFAll a => ScalarType a -> TensorOp (In DIM1 a -> In sh Int -> Out sh a -> ())
+  TWhere       :: TensorOp (In DIM1 Int -> Out DIM1 Int -> ())
+  TBooleanMask :: OneOf TFAll a => ScalarType a -> TensorOp (In DIM1 (a, PrimBool) -> Out DIM1 a -> ())
 
   -- operators from Num
   TAdd  :: OneOf TFNum  a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
@@ -99,7 +100,6 @@ data TensorOp op where
   TCast :: (TensorType a, TensorType b) => ScalarType a -> ScalarType b -> TensorOp (In sh a -> Out sh b -> ())
 
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
-  TBooleanMask :: ScalarType s -> TensorOp (In DIM1 s -> In DIM1 PrimBool -> Out DIM1 s -> ())
 
 instance EncodeOperation TensorOp where
   encodeOperation :: TensorOp t -> Builder
