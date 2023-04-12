@@ -226,3 +226,19 @@ tfAllDict (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   = erro
 tfAllDict (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  = OneOfDict
 tfAllDict (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) = OneOfDict
 tfAllDict (VectorScalarType _) = error "not a TF all type"
+
+zero :: ScalarType t -> t
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeInt8)))   = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeInt16)))  = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeInt32)))  = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeInt64)))  = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeWord)))   = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeWord8)))  = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeWord16))) = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeWord32))) = 0
+zero (SingleScalarType (NumSingleType (IntegralNumType TypeWord64))) = 0
+zero (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   = 0
+zero (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  = 0
+zero (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) = 0
+zero (VectorScalarType _)                                            = error "not a zero type"

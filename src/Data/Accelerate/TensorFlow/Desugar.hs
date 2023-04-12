@@ -11,11 +11,10 @@ import Data.Array.Accelerate.AST.Operation
       paramsIn',
       fromGrounds,
       PrimFun(..),
-      Var(Var),
       PreArgs((:>:), ArgsNil),
       ExpVars,
-      PreOpenAcc(Compute, Exec, Return, Alet),
-      GroundR(GroundRscalar, GroundRbuffer),
+      PreOpenAcc(..),
+      GroundR(GroundRscalar),
       Modifier(In, Mut, Out),
       PreOpenExp(..),
       PreOpenFun(Body, Lam),
@@ -24,7 +23,7 @@ import Data.Array.Accelerate.AST.Operation
       OperationAcc,
       Out,
       In,
-      Arg(ArgFun, ArgArray, ArgVar), varType, paramsIn )
+      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..) )
 import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(LeftHandSideWildcard, LeftHandSideSingle) )
 import Data.Array.Accelerate.Backend
@@ -33,17 +32,17 @@ import Data.Array.Accelerate.Type
     ( Word8,
       scalarTypeWord8,
       scalarTypeInt,
-      IntegralType(TypeInt),
+      IntegralType(..),
       NumType(IntegralNumType, FloatingNumType),
       SingleType(NumSingleType),
-      ScalarType(SingleScalarType) )
+      ScalarType(SingleScalarType), BoundedType (..) )
 import Data.Array.Accelerate.Representation.Array
     ( Buffer, Buffers, ArrayR(ArrayR) )
 import Data.Array.Accelerate.Representation.Type
     ( Distributes(reprIsSingle),
       Distribute,
       TupR(TupRpair, TupRunit, TupRsingle),
-      TypeR, mapTupR )
+      TypeR )
 import Data.Array.Accelerate.Trafo.Var
     ( declareVars, DeclareVars(DeclareVars) )
 import Data.Array.Accelerate.AST.Idx ( Idx(ZeroIdx, SuccIdx) )
@@ -61,7 +60,27 @@ import Data.Array.Accelerate.Representation.Shape
 import Prelude hiding (exp)
 
 import Data.Accelerate.TensorFlow.Type
+    ( TensorTypeDict(TensorTypeDict),
+      tfTensorTypeDict,
+      tfAllDict,
+      tfFloatDict,
+      tfIntDict,
+      tfModDict,
+      tfNum'Dict,
+      tfNumDict,
+      tfOrdDict,
+      OneOfDict(OneOfDict), zero )
 import Data.Accelerate.TensorFlow.Operation
+    ( TensorOp(TWhere, TTensorScatter, TCast, TBooleanMask, TConstant,
+               TId, TGather, TVar, TSelect, TAdd, TMul, TSub, TNeg, TAbs, TSign,
+               TTruncateDiv, TTruncateMod, TBitwiseAnd, TBitwiseOr, TBitwiseXor,
+               TInvert, TRealDiv, TReciprocal, TSin, TCos, TTan, TAsin, TAcos,
+               TAtan, TSinh, TCosh, TTanh, TAsinh, TAcosh, TAtanh, TExp, TSqrt,
+               TLog, TPow, TAtan2, TLess, TGreater, TLessEqual, TGreaterEqual,
+               TEqual, TNotEqual, TMaximum, TMinimum, TLogicalAnd, TLogicalOr,
+               TLogicalNot),
+      ScatterFun(ScatterFunMin, ScatterFunAdd) )
+import Data.Array.Accelerate.Interpreter (evalMinBound, evalPi, evalMaxBound)
 
 instance DesugarAcc TensorOp where
   mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ (ArrayR _ t) _ gvb) aOut =
@@ -156,7 +175,9 @@ instance DesugarAcc TensorOp where
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
-booleanMask t@(TupRsingle s) aOut@(ArgArray _ _ gv _) gvbIn gvbOut = Exec (TBooleanMask s) (ArgArray In (ArrayR dim1 t) gv gvbIn :>: aOut :>: ArgArray Out (ArrayR dim1 t) gv gvbOut :>: ArgsNil)
+booleanMask t@(TupRsingle s) (ArgArray _ _ gv gvbIn2) gvbIn1 gvbOut
+  | OneOfDict <- tfAllDict s
+  = Exec (TBooleanMask s) (ArgArray In (ArrayR dim1 (TupRpair t (TupRsingle scalarTypeWord8))) gv (TupRpair gvbIn1 gvbIn2) :>: ArgArray Out (ArrayR dim1 t) gv gvbOut :>: ArgsNil)
 booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit
  (booleanMask t1 aOut gvbIn1 gvbOut1)
  (booleanMask t2 aOut gvbIn2 gvbOut2)
@@ -223,15 +244,10 @@ mkMapF env (FromIndex sh exp1 exp2) aOut
   , DeclareVars lhs' w' k' <- declareVars $ TupRsingle scalarTypeInt
   = mkMapF env (Let lhs exp1 (Let lhs' (weakenE w exp2) (fromIndex sh (k w') (k' weakenId)))) aOut
 
--- todo add preprocess check to throw an error if theres a loop, mem access, etc.
-mkMapF env (Cond cond (Pair exp11 exp12) (Pair exp21 exp22)) (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2)) =
-  Alet (LeftHandSideWildcard TupRunit) TupRunit
-  (mkMapF env (Cond cond exp11 exp21) (ArgArray Out (ArrayR sh t1) gv gvb1))
-  (mkMapF env (Cond cond exp12 exp22) (ArgArray Out (ArrayR sh t2) gv gvb2))
 mkMapF env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
-  | TupRsingle s <- expType exp1
-  , OneOfDict <- tfAllDict s
-  , DeclareVars lhs w k <- declareVars $ buffersR $ TupRsingle scalarTypeWord8
+  -- -| isNotLoop exp1 -- todo add preprocess check to throw an error if theres a loop, mem access, etc.
+  -- , isNotLoop exp2
+  | DeclareVars lhs w k <- declareVars $ buffersR $ TupRsingle scalarTypeWord8
   , DeclareVars lhs' w' k' <- declareVars $ buffersR t
   , DeclareVars lhs'' w'' k'' <- declareVars $ buffersR t
   = aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeWord8)) (fromGrounds gv)) $
@@ -243,15 +259,13 @@ mkMapF env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
     aletUnique lhs'' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w' .> w) gv))) $
     Alet (LeftHandSideWildcard TupRunit) TupRunit
     (mkMapF (weakenEnv (w'' .> w' .> w) env) (weakenArrayInstr (w'' .> w' .> w) exp2) (ArgArray Out (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId)))
-    (Exec
-      (TSelect s)
-      (
-        ArgArray In (ArrayR sh (TupRpair (TupRsingle scalarTypeWord8) (TupRpair (TupRsingle s) (TupRsingle s)))) (weakenVars (w'' .> w' .> w) gv) (TupRpair (k (w'' .> w')) (TupRpair (k' w'') (k'' weakenId))) :>:
-        ArgArray Out (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb) :>:
-        ArgsNil
-      )
+    (select
+      t
+      (ArgArray In (ArrayR sh (TupRsingle scalarTypeWord8)) (weakenVars (w'' .> w' .> w) gv) (k (w'' .> w')))
+      (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k' w''))
+      (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId))
+      (ArgArray Out (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb))
     )
-mkMapF env (Cond cond exp1 exp2) _ = error "here"
 
 mkMapF _ Nil _ = Return TupRunit
 
@@ -265,7 +279,7 @@ mkMapF env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t@(TupRsingle st)
     aletUnique lhs (Compute (ShapeSize sh (paramsIn' $ fromGrounds gv))) $
     aletUnique lhs' (desugarAlloc (ArrayR sh i) (weakenVars w $ fromGrounds gv)) $
     Alet (LeftHandSideWildcard TupRunit) TupRunit
-    (mkMapF (weakenEnv (w' .> w) env) (weakenArrayInstr (w' .> w) exp) (ArgArray Out (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId))) 
+    (mkMapF (weakenEnv (w' .> w) env) (weakenArrayInstr (w' .> w) exp) (ArgArray Out (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId)))
     (Exec
       (TGather st)
       (
@@ -275,7 +289,6 @@ mkMapF env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t@(TupRsingle st)
         ArgsNil
       )
     )
-mkMapF env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t) gv gvb) = error "here"
 
 mkMapF _ (ArrayInstr (Parameter var@(Var st _)) Nil) aOut
   | OneOfDict <- tfAllDict st
@@ -286,22 +299,54 @@ mkMapF _ (ArrayInstr (Parameter var@(Var st _)) Nil) aOut
         aOut :>:
         ArgsNil
       )
-mkMapF _ (ArrayInstr (Parameter var@(Var st _)) _) aOut = error "here"
 
-mkMapF _ (Foreign _ _ _ _) _ = undefined
-mkMapF _ (VecPack _ _) _ = undefined
-mkMapF _ (VecUnpack _ _) _ = undefined
-mkMapF _ (IndexSlice _ _ _) _ = undefined
-mkMapF _ (IndexFull _ _ _) _ = undefined
+mkMapF env (Undef st) aOut = mkMapF env (Const st (zero st)) aOut
+mkMapF env (Coerce stIn stOut exp) (ArgArray _ (ArrayR sh t) gv gvb)
+  | OneOfDict <- tfAllDict stIn
+  , OneOfDict <- tfAllDict stOut
+  , a <- expType exp
+  , DeclareVars lhs w k <- declareVars $ buffersR a
+  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
+    Alet (LeftHandSideWildcard TupRunit) TupRunit
+    (mkMapF (weakenEnv w env) (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId)))
+    (Exec
+      (TCast stIn stOut)
+      ( ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>:
+        ArgArray Out (ArrayR sh t) (weakenVars w gv) (weakenVars w gvb) :>:
+        ArgsNil)
+     )
 
-mkMapF _ (Case _ _ _) _ = undefined
+mkMapF env (PrimConst (PrimMinBound bt@(IntegralBoundedType it))) aOut = mkMapF env (Const (SingleScalarType (NumSingleType (IntegralNumType it))) (evalMinBound bt)) aOut
+mkMapF env (PrimConst (PrimMaxBound bt@(IntegralBoundedType it))) aOut = mkMapF env (Const (SingleScalarType (NumSingleType (IntegralNumType it))) (evalMaxBound bt)) aOut
+mkMapF env (PrimConst (PrimPi ft)) aOut                                = mkMapF env (Const (SingleScalarType (NumSingleType (FloatingNumType ft))) (evalPi ft)) aOut
 
-mkMapF _ (While _ _ _) _ = undefined -- see loopcond?
-mkMapF _ (PrimConst _) _ = undefined
+-- TODO
+mkMapF _ (Foreign _ _ fallback exp) aOut = undefined -- voor een backend 1 defitie, plus fallback, dat is een expr functie die aangeroepen kan worden. Die fallback kan altijd gebruikt worden.
+mkMapF _ (IndexSlice _ _ _) _ = undefined -- vraag: wat is dit? -- backpermute (matrix slice)
+mkMapF _ (IndexFull _ _ _) _ = undefined -- vraag: wat is dit? -- andersom (kopieer vector naar matrix)
 
-mkMapF _ (Undef _) _ = undefined
-mkMapF _ (Coerce _ _ _) _ = undefined
+-- Not supported
+mkMapF _ VecPack {} _   = error "VecPack operation not supported by TensorFlow backend."
+mkMapF _ VecUnpack {} _ = error "VecUnpack operation not supported by TensorFlow backend."
+mkMapF _ Case {} _      = error "Case operation not supported by TensorFlow backend."
+mkMapF _ While {} _     = error "While operation not supported by TensorFlow backend."
+
 mkMapF _ _ _ = error "impossible"
+
+select :: TypeR t -> Arg env (In sh Word8) -> Arg env (In sh t) -> Arg env (In sh t) -> Arg env (Out sh t) -> PreOpenAcc TensorOp env ()
+select (TupRpair t1 t2) (ArgArray _ (ArrayR sh tWord8) gvIn1 gvbIn1) (ArgArray _ _ gvIn2 (TupRpair gvbIn21 gvbIn22)) (ArgArray _ _ gvIn3 (TupRpair gvbIn31 gvbIn32)) (ArgArray _ _ gvOut (TupRpair gvbOut1 gvbOut2)) =
+  Alet (LeftHandSideWildcard TupRunit) TupRunit
+  (select t1 (ArgArray In (ArrayR sh tWord8) gvIn1 gvbIn1) (ArgArray In (ArrayR sh t1) gvIn2 gvbIn21) (ArgArray In (ArrayR sh t1) gvIn3 gvbIn31) (ArgArray Out (ArrayR sh t1) gvOut gvbOut1))
+  (select t2 (ArgArray In (ArrayR sh tWord8) gvIn1 gvbIn1) (ArgArray In (ArrayR sh t2) gvIn2 gvbIn22) (ArgArray In (ArrayR sh t2) gvIn3 gvbIn32) (ArgArray Out (ArrayR sh t2) gvOut gvbOut2))
+select t@(TupRsingle s) (ArgArray _ (ArrayR sh tWord8) gvIn1 gvbIn1) (ArgArray _ _ _ gvbIn2) (ArgArray _ _ _ gvbIn3) (ArgArray _ _ gvOut gvbOut)
+  | OneOfDict <- tfAllDict s
+  = Exec
+    (TSelect s)
+    (ArgArray In (ArrayR sh (TupRpair tWord8 (TupRpair (TupRsingle s) (TupRsingle s)))) gvIn1 (TupRpair gvbIn1 (TupRpair gvbIn2 gvbIn3)) :>:
+     ArgArray Out (ArrayR sh t) gvOut gvbOut :>:
+     ArgsNil)
+select TupRunit _ _ _ _ = Return TupRunit
+select _ _ _ _ _ = error "impossible"
 
 mkMapPrimAppF :: PrimFun (a -> t) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
 mkMapPrimAppF (PrimAdd nt)  | OneOfDict <- tfNumDict nt = mkMapPrimAppF'  $ TAdd (SingleScalarType (NumSingleType nt))
@@ -319,7 +364,7 @@ mkMapPrimAppF (PrimIDiv it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkMa
 mkMapPrimAppF (PrimMod it)  | OneOfDict <- tfModDict it = mkMapPrimAppF' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
 
 mkMapPrimAppF (PrimDivMod it) = mkMapPrimAppF2' (PrimIDiv it) (PrimMod it)
- 
+
 mkMapPrimAppF (PrimBAnd it) | OneOfDict <- tfIntDict it = mkMapPrimAppF' $ TBitwiseAnd (SingleScalarType (NumSingleType (IntegralNumType it)))
 mkMapPrimAppF (PrimBOr it)  | OneOfDict <- tfIntDict it = mkMapPrimAppF' $ TBitwiseOr (SingleScalarType (NumSingleType (IntegralNumType it)))
 mkMapPrimAppF (PrimBXor it) | OneOfDict <- tfIntDict it = mkMapPrimAppF' $ TBitwiseXor (SingleScalarType (NumSingleType (IntegralNumType it)))
@@ -374,7 +419,7 @@ mkMapPrimAppF PrimLAnd = mkMapPrimAppF' TLogicalAnd
 mkMapPrimAppF PrimLOr = mkMapPrimAppF' TLogicalOr
 mkMapPrimAppF PrimLNot = mkMapPrimAppF' TLogicalNot
 
-mkMapPrimAppF (PrimFromIntegral it nt) 
+mkMapPrimAppF (PrimFromIntegral it nt)
   | TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType (IntegralNumType it)))
   , TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType nt))
   = mkMapPrimAppF' $ TCast (SingleScalarType (NumSingleType (IntegralNumType it))) (SingleScalarType (NumSingleType nt))
@@ -443,9 +488,9 @@ fromIndex ShapeRz TupRunit _                                = Nil
 fromIndex (ShapeRsnoc shr) (TupRpair sh (TupRsingle sz)) (TupRsingle i)
   | DeclareVars lhs w k <- declareVars $ TupRsingle scalarTypeInt
   = Pair
-    (Let 
-      lhs 
-      (PrimApp (PrimQuot TypeInt) (Pair (Evar i) (Evar sz))) 
+    (Let
+      lhs
+      (PrimApp (PrimQuot TypeInt) (Pair (Evar i) (Evar sz)))
       (fromIndex shr (weakenVars w sh) (k weakenId)))
     (case shr of
       ShapeRz -> Evar i

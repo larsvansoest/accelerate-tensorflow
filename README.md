@@ -47,3 +47,6 @@ https://www.haskell.org/ghcup/install/
 2. Navigate to the repository root, and run `stack install`, verify that the code inspection from the VSCode Haskell extension works accordingly.
   > this may not always work right from the start, try running `stack setup` or `stack install` or reloading the window until it does. Otherwise, head to the VSCode Haskell Extension settings and set `Manage HLS` to `Ghcup`. To check the status of compilation, head to `View > OutPut` and select the `Haskell` extension.
   > If VSCode Haskell extension reports an error on ghcide compliation version, run `ghcup set ghc 8.10.7` and reload the window.
+
+# TODO
+- Literatuur over het flattenen van een while loop.

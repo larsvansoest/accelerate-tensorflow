@@ -41,6 +41,7 @@ data TensorOp op where
   TGather      :: OneOf TFAll a => ScalarType a -> TensorOp (In DIM1 a -> In sh Int -> Out sh a -> ())
   TWhere       :: TensorOp (In DIM1 Int -> Out DIM1 Int -> ())
   TBooleanMask :: OneOf TFAll a => ScalarType a -> TensorOp (In DIM1 (a, PrimBool) -> Out DIM1 a -> ())
+  TCast :: (TensorType a, TensorType b) => ScalarType a -> ScalarType b -> TensorOp (In sh a -> Out sh b -> ())
 
   -- operators from Num
   TAdd  :: OneOf TFNum  a => ScalarType a -> TensorOp (In sh (a, a) -> Out sh a -> ())
@@ -96,8 +97,6 @@ data TensorOp op where
   TLogicalAnd :: TensorOp (In sh (PrimBool, PrimBool) -> Out sh PrimBool -> ())
   TLogicalOr  :: TensorOp (In sh (PrimBool, PrimBool) -> Out sh PrimBool -> ())
   TLogicalNot :: TensorOp (In sh PrimBool -> Out sh PrimBool -> ())
-
-  TCast :: (TensorType a, TensorType b) => ScalarType a -> ScalarType b -> TensorOp (In sh a -> Out sh b -> ())
 
   TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
 

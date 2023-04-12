@@ -23,6 +23,14 @@ import Data.Array.Accelerate.Pretty.Schedule.Sequential
 type Stencil5x1 a = (Stencil3 a, Stencil5 a, Stencil3 a)
 type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 
+-- TODO: Add tests for: test for different sizes for zipwith (ongelijke matrices maakt gebruik van minimum dimensions)
+
+-- main :: IO ()
+-- main = let x = use (fromList (Z:.5:.10) [0..])
+--            z = shape x
+--            y = map (Data.Array.Accelerate.fromIndex (shape x)) x
+--        in putStrLn $ show $ run @TensorFlow y
+
 main :: IO ()
 main = defaultMain tests
 
@@ -38,78 +46,78 @@ assertAcc acc = run @TensorFlow acc @?= run @Interpreter acc
 
 assertAcc2 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b) => (Acc a, Acc b) -> Assertion
 assertAcc2 (a, b) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b
+  [ assertAcc a,
+    assertAcc b
   ]
 
 assertAcc3 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c) => (Acc a, Acc b, Acc c) -> Assertion
 assertAcc3 (a, b, c) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b,
-    run @TensorFlow c @?= run @Interpreter c
+  [ assertAcc a,
+    assertAcc b,
+    assertAcc c
   ]
 
 assertAcc4 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d) => (Acc a, Acc b, Acc c, Acc d) -> Assertion
 assertAcc4 (a, b, c, d) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b,
-    run @TensorFlow c @?= run @Interpreter c,
-    run @TensorFlow d @?= run @Interpreter d
+  [ assertAcc a,
+    assertAcc b,
+    assertAcc c,
+    assertAcc d
   ]
 
 assertAcc5 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e) => (Acc a, Acc b, Acc c, Acc d, Acc e) -> Assertion
 assertAcc5 (a, b, c, d, e) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b,
-    run @TensorFlow c @?= run @Interpreter c,
-    run @TensorFlow d @?= run @Interpreter d,
-    run @TensorFlow e @?= run @Interpreter e
+  [ assertAcc a,
+    assertAcc b,
+    assertAcc c,
+    assertAcc d,
+    assertAcc e
   ]
 
 assertAcc6 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f) -> Assertion
 assertAcc6 (a, b, c, d, e, f) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b,
-    run @TensorFlow c @?= run @Interpreter c,
-    run @TensorFlow d @?= run @Interpreter d,
-    run @TensorFlow e @?= run @Interpreter e,
-    run @TensorFlow f @?= run @Interpreter f
+  [ assertAcc a,
+    assertAcc b,
+    assertAcc c,
+    assertAcc d,
+    assertAcc e,
+    assertAcc f
   ]
 
 assertAcc7 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f, Arrays g, Eq g, Show g) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f, Acc g) -> Assertion
 assertAcc7 (a, b, c, d, e, f, g) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b,
-    run @TensorFlow c @?= run @Interpreter c,
-    run @TensorFlow d @?= run @Interpreter d,
-    run @TensorFlow e @?= run @Interpreter e,
-    run @TensorFlow f @?= run @Interpreter f,
-    run @TensorFlow g @?= run @Interpreter g
+  [ assertAcc a,
+    assertAcc b,
+    assertAcc c,
+    assertAcc d,
+    assertAcc e,
+    assertAcc f,
+    assertAcc g
   ]
 
 assertAcc8 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f, Arrays g, Eq g, Show g, Arrays h, Eq h, Show h) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f, Acc g, Acc h) -> Assertion
 assertAcc8 (a, b, c, d, e, f, g, h) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b,
-    run @TensorFlow c @?= run @Interpreter c,
-    run @TensorFlow d @?= run @Interpreter d,
-    run @TensorFlow e @?= run @Interpreter e,
-    run @TensorFlow f @?= run @Interpreter f,
-    run @TensorFlow g @?= run @Interpreter g,
-    run @TensorFlow h @?= run @Interpreter h
+  [ assertAcc a,
+    assertAcc b,
+    assertAcc c,
+    assertAcc d,
+    assertAcc e,
+    assertAcc f,
+    assertAcc g,
+    assertAcc h
   ]
 
 assertAcc9 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b, Arrays c, Eq c, Show c, Arrays d, Eq d, Show d, Arrays e, Eq e, Show e, Arrays f, Eq f, Show f, Arrays g, Eq g, Show g, Arrays h, Eq h, Show h, Arrays i, Eq i, Show i) => (Acc a, Acc b, Acc c, Acc d, Acc e, Acc f, Acc g, Acc h, Acc i) -> Assertion
 assertAcc9 (a, b, c, d, e, f, g, h, i) = sequence_
-  [ run @TensorFlow a @?= run @Interpreter a,
-    run @TensorFlow b @?= run @Interpreter b,
-    run @TensorFlow c @?= run @Interpreter c,
-    run @TensorFlow d @?= run @Interpreter d,
-    run @TensorFlow e @?= run @Interpreter e,
-    run @TensorFlow f @?= run @Interpreter f,
-    run @TensorFlow g @?= run @Interpreter g,
-    run @TensorFlow h @?= run @Interpreter h,
-    run @TensorFlow i @?= run @Interpreter i
+  [ assertAcc a,
+    assertAcc b,
+    assertAcc c,
+    assertAcc d,
+    assertAcc e,
+    assertAcc f,
+    assertAcc g,
+    assertAcc h,
+    assertAcc i
   ]
 
 tAccelerateArrayLanguage :: TestTree
@@ -1069,7 +1077,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                         tLogBase = testGroup "logBase"
                           [ testCase "logBase" $ assertAcc (map (logBase (2 :: Exp Float)) (use vec1'))
                           ]
-                        
+
 
                 tRealFrac = testGroup "RealFrac"
                   [ tProperFraction,
@@ -1211,7 +1219,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                         tUncurry = testGroup "uncurry"
                           [ testCase "uncurry" $ assertAcc (map (uncurry (+)) $ zip (use ones) (use zeroes))
                           ]
-                        
+
                 tFlowControl = testGroup "Flow Control"
                   [ tQuestionMark,
                     tMatch,
