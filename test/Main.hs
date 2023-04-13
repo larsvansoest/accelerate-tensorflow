@@ -34,6 +34,12 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 main :: IO ()
 main = defaultMain tests
 
+-- main :: IO ()
+-- main = defaultMain $ testGroup "generate"
+--   [
+--     testCase "generate" $ assertAcc (generate (I1 10) (\(I1 i) -> fromIntegral $ i + 1) :: Acc (Array DIM1 Int64))
+--   ]
+
 tests :: TestTree
 tests = testGroup "tests"
   [ tAccelerateArrayLanguage,

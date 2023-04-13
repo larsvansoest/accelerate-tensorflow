@@ -14,7 +14,7 @@ import Data.Accelerate.TensorFlow.Type
     ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod )
 import Data.Array.Accelerate.Type ( ScalarType )
 import Data.Array.Accelerate.AST.Operation
-    ( PrimBool, Mut, Out, In, NFData'(..), Var', ExpVar )
+    ( PrimBool, Mut, Out, In, NFData'(..), Var' )
 import Data.Array.Accelerate
     ( MakesILP(..),
       ShrinkArg(..),
@@ -22,16 +22,14 @@ import Data.Array.Accelerate
       SimplifyOperation,
       PrettyOp(prettyOp),
       EncodeOperation(..))
-import Data.Array.Accelerate.Pretty.Exp ( prettyConst, Adoc )
+import Data.Array.Accelerate.Pretty.Exp ( Adoc )
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Labels (LabelledArg(..))
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
     ( LabelledArgOp(LOp) )
-import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarType, encodeScalarConst, Builder, encodeExpVar)
+import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarType, encodeScalarConst, Builder)
 import Prettyprinter ( viaShow, vsep )
 import Data.Array.Accelerate.Pretty.Type ( prettyScalarType )
-import Data.Array.Accelerate.Representation.Type
-    ( TupR(TupRsingle), TypeR )
-import Data.Array.Accelerate.Representation.Shape (DIM1, ShapeR)
+import Data.Array.Accelerate.Representation.Shape (DIM1)
 
 data TensorOp op where
   TConstant    :: OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())

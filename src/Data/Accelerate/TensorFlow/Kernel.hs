@@ -25,7 +25,7 @@ import Data.Array.Accelerate.AST.Schedule.Uniform
       BaseVar,
       Cluster,
       BaseR(BaseRground),
-      AccessGroundR, ExpVar, GroundR (GroundRscalar) )
+      AccessGroundR, GroundR (GroundRscalar) )
 import Data.Array.Accelerate.Array.Buffer ( Buffer, Buffers )
 import Data.Array.Accelerate.Representation.Type
     ( Distributes(reprIsSingle),
@@ -48,14 +48,13 @@ import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.Representation.Array
     ( ArrayR(ArrayR) )
 import Data.Array.Accelerate.Type ( scalarTypeWord8, ScalarType, scalarTypeInt )
-import Data.Array.Accelerate.Representation.Shape (shapeType, DIM1, ShapeR (ShapeRz, ShapeRsnoc))
 
 
 data TensorKernel env where
-  TensorConstant     :: TensorType a => ScalarType a -> a -> BaseVar env (Buffer a) -> TensorKernel env
-  TensorVar          :: TensorType a => ScalarType a -> BaseVar env a -> BaseVar env (Buffer a) -> TensorKernel env
-  TensorId           :: OneOf TFAll a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
-  TensorSelect       :: OneOf TFAll a => BaseVar env (Buffer PrimBool) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorConstant    :: TensorType a => ScalarType a -> a -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorVar         :: TensorType a => ScalarType a -> BaseVar env a -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorId          :: OneOf TFAll a => BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
+  TensorSelect      :: OneOf TFAll a => BaseVar env (Buffer PrimBool) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorWhere       :: BaseVar env (Buffer Int) -> BaseVar env (Buffer Int) -> TensorKernel env
   TensorGather      :: OneOf TFAll a => BaseVar env (Buffer a) -> BaseVar env (Buffer Int) -> BaseVar env (Buffer a) -> TensorKernel env
   TensorBooleanMask :: OneOf TFAll a => BaseVar env (Buffer a) -> BaseVar env (Buffer PrimBool) -> BaseVar env (Buffer a) -> TensorKernel env
