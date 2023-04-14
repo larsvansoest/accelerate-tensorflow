@@ -412,9 +412,9 @@ mkPrimFun (PrimExpFloating ft) | OneOfDict <- tfFloatDict ft          = mkUnaryP
 mkPrimFun (PrimSqrt ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TSqrt
 mkPrimFun (PrimLog ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TLog
 mkPrimFun (PrimFPow ft) | OneOfDict <- tfFloatDict ft                 = mkBinaryPrimFun TPow
-mkPrimFun (PrimLogBase ft) | OneOfDict <- tfFloatDict ft              = undefined -- mkPrimFun' $ TLog1p
+mkPrimFun (PrimLogBase ft) | OneOfDict <- tfFloatDict ft              = undefined -- mkBinaryPrimFun TLog1p
 
-mkPrimFun (PrimTruncate ta tb)                                        = undefined
+mkPrimFun (PrimTruncate _ _)                                          = error "Truncate to 0 not supported by TensorFlow."
 mkPrimFun (PrimRound ft it) 
   | OneOfDict <- tfFloatDict ft , OneOfDict <- tfIntDict it           = mkUnaryPrimFun TRound
 mkPrimFun (PrimFloor ft it)
