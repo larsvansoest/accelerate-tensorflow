@@ -34,19 +34,13 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 -- main :: IO ()
 -- main = defaultMain tests
 
--- main :: IO ()
--- main = defaultMain $ testGroup "generate"
---   [
---     testCase "generate" $ assertAcc (generate (I2 5 10) (\(I2 i j) -> fromIntegral $ i * j + i) :: Acc (Array DIM2 Int64))
---   ]
-
 main :: IO ()
 main = do 
-  let acc = init (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))
-  putStrLn $ test @UniformScheduleFun @TensorKernel $ init (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))
-  defaultMain $ testGroup "generate"
+  let acc = (use (fromList (Z:.5:.10) [0..]) ++ use (fromList (Z:.10:.3) [0..]) :: Acc (Array DIM2 Int64))
+  putStrLn $ test @UniformScheduleFun @TensorKernel $ acc
+  defaultMain $ testGroup "test1"
     [
-      testCase "indexed mat" $ assertAcc (indexed (use (fromList (Z:.3:.4) [0..] :: Matrix Float)))
+      testCase "test" $ assertAcc acc
     ]
 
 

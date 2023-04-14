@@ -89,6 +89,13 @@ data TensorOp op where
   TLog1p      :: OneOf TFFloat a => TensorOp (In sh a -> Out sh a -> ())
   TAtan2      :: OneOf TFFloat a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
 
+  TRound      :: (OneOf TFFloat a, OneOf TFInt b) => TensorOp (In sh a -> Out sh b -> ())
+  TFloor      :: (OneOf TFFloat a, OneOf TFInt b) => TensorOp (In sh a -> Out sh b -> ())
+  TCeil       :: (OneOf TFFloat a, OneOf TFInt b) => TensorOp (In sh a -> Out sh b -> ())
+
+  TIsNan      :: OneOf TFFloat a => TensorOp (In sh a -> Out sh PrimBool -> ())
+  TIsInf      :: OneOf TFFloat a => TensorOp (In sh a -> Out sh PrimBool -> ())
+
   -- relational and equality operators
   TLess         :: OneOf TFOrd a => TensorOp (In sh a -> In sh a -> Out sh PrimBool -> ())
   TGreater      :: OneOf TFOrd a => TensorOp (In sh a -> In sh a -> Out sh PrimBool -> ())
@@ -223,7 +230,7 @@ instance NFData' TensorOp where
 
 instance SimplifyOperation TensorOp where
   -- detectCopy :: (forall t t'. GroundVars env t -> GroundVars env t' -> Maybe (t :~: t')) -> TensorOp op -> Args env op -> [CopyOperation env]
-  -- detectCopy _ TId (ArgArray _ (ArrayR _ t) _ gvbIn :>: ArgArray _ _ _ gvbOut :>: ArgsNil)  = copyOperation t gvbIn gvbOut
+  -- detectCopy _ TId (ArgArray _ (ArrayR _ t) _ gvbIn :>: ArgArray _ _ _ gvbOut :>: ArgsNil) = copyOperation t gvbIn gvbOut
   -- detectCopy _ _ _ = []
 
 copyOperation :: TypeR e -> GroundVars env (Buffers e) -> GroundVars env (Buffers e) -> [CopyOperation env]

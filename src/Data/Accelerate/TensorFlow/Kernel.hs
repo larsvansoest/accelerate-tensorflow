@@ -99,7 +99,16 @@ data TensorKernel env where
   TensorLog        :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorPow        :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorLog1p      :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
+
+  -- operators from RealFrac
+  TensorRound :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+  TensorFloor :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+  TensorCeil  :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+
+  -- operators from RealFloat
   TensorAtan2      :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
+  TensorIsNan      :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh PrimBool -> TensorKernel env
+  TensorIsInf      :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh PrimBool -> TensorKernel env
 
   -- relational and equality operators
   TensorLess         :: OneOf TFOrd a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh PrimBool -> TensorKernel env
@@ -190,6 +199,10 @@ compileOperation TLog (aIn :>: aOut :>: _)                                  = Te
 compileOperation TPow (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorPow (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TLog1p (aIn :>: aOut :>: _)                                = TensorLog1p (arg aIn) (arg aOut)
 compileOperation TAtan2 (aIn1 :>: aIn2 :>: aOut :>: _)                      = TensorAtan2 (arg aIn1) (arg aIn2) (arg aOut)
+
+compileOperation TRound (aIn :>: aOut :>: _)                                = TensorRound (arg aIn) (arg aOut)
+compileOperation TFloor (aIn :>: aOut :>: _)                                = TensorFloor (arg aIn) (arg aOut)
+compileOperation TCeil (aIn :>: aOut :>: _)                                 = TensorCeil (arg aIn) (arg aOut)
 
 compileOperation TLess (aIn1 :>: aIn2 :>: aOut :>: _)                       = TensorLess (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TGreater (aIn1 :>: aIn2 :>: aOut :>: _)                    = TensorGreater (arg aIn1) (arg aIn2) (arg aOut)

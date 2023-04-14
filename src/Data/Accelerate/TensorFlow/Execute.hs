@@ -260,6 +260,13 @@ executeKernel env (TensorPow aIn1 aIn2 aOut)          = executeBinaryKernel env 
 executeKernel env (TensorLog1p aIn aOut)              = executeUnaryKernel env aIn aOut TF.log1p
 executeKernel env (TensorAtan2 aIn1 aIn2 aOut)        = executeBinaryKernel env aIn1 aIn2 aOut TF.atan2
  
+executeKernel env (TensorRound aIn aOut)              = executeUnaryKernel env aIn aOut $ TF.cast . TF.round
+executeKernel env (TensorFloor aIn aOut)              = executeUnaryKernel env aIn aOut $ TF.cast . TF.floor
+executeKernel env (TensorCeil aIn aOut)               = executeUnaryKernel env aIn aOut $ TF.cast . TF.ceil
+
+executeKernel env (TensorIsNan aIn aOut)              = executeUnaryKernel env aIn aOut $ TF.cast . TF.isNan
+executeKernel env (TensorIsInf aIn aOut)              = executeUnaryKernel env aIn aOut $ TF.cast . TF.isInf
+
 executeKernel env (TensorLess aIn1 aIn2 aOut)         = executeBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.cast (TF.less x y))
 executeKernel env (TensorGreater aIn1 aIn2 aOut)      = executeBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.cast (TF.greater x y))
 executeKernel env (TensorLessEqual aIn1 aIn2 aOut)    = executeBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.cast (TF.lessEqual x y))

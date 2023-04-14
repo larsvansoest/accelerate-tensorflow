@@ -30,7 +30,7 @@ import Data.Array.Accelerate.AST.Operation
 import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(LeftHandSideWildcard, LeftHandSideSingle) )
 import Data.Array.Accelerate.Backend
-    ( DesugarAcc(mkGenerate, mkPermute, mkMap) )
+    ( DesugarAcc(mkGenerate, mkPermute, mkMap, mkBackpermute) )
 import Data.Array.Accelerate.Type
     ( Word8,
       scalarTypeWord8,
@@ -74,14 +74,7 @@ import Data.Accelerate.TensorFlow.Type
       tfOrdDict,
       OneOfDict(OneOfDict), zero )
 import Data.Accelerate.TensorFlow.Operation
-    ( TensorOp(TWhere, TTensorScatter, TCast, TBooleanMask, TConstant,
-               TId, TGather, TVar, TSelect, TAdd, TMul, TSub, TNeg, TAbs, TSign,
-               TTruncateDiv, TTruncateMod, TBitwiseAnd, TBitwiseOr, TBitwiseXor,
-               TInvert, TRealDiv, TReciprocal, TSin, TCos, TTan, TAsin, TAcos,
-               TAtan, TSinh, TCosh, TTanh, TAsinh, TAcosh, TAtanh, TExp, TSqrt,
-               TLog, TPow, TAtan2, TLess, TGreater, TLessEqual, TGreaterEqual,
-               TEqual, TNotEqual, TMaximum, TMinimum, TLogicalAnd, TLogicalOr,
-               TLogicalNot),
+    ( TensorOp(..),
       ScatterFun(ScatterFunMin, ScatterFunAdd) )
 import Data.Array.Accelerate.Interpreter (evalMinBound, evalPi, evalMaxBound)
 import Data.Array.Accelerate.Representation.Slice
@@ -422,13 +415,16 @@ mkPrimFun (PrimFPow ft) | OneOfDict <- tfFloatDict ft                 = mkBinary
 mkPrimFun (PrimLogBase ft) | OneOfDict <- tfFloatDict ft              = undefined -- mkPrimFun' $ TLog1p
 
 mkPrimFun (PrimTruncate ta tb)                                        = undefined
-mkPrimFun (PrimRound ta tb)                                           = undefined
-mkPrimFun (PrimFloor ta tb)                                           = undefined
-mkPrimFun (PrimCeiling ta tb)                                         = undefined
+mkPrimFun (PrimRound ft it) 
+  | OneOfDict <- tfFloatDict ft , OneOfDict <- tfIntDict it           = mkUnaryPrimFun TRound
+mkPrimFun (PrimFloor ft it)
+  | OneOfDict <- tfFloatDict ft , OneOfDict <- tfIntDict it           = mkUnaryPrimFun TFloor
+mkPrimFun (PrimCeiling ft it)
+  | OneOfDict <- tfFloatDict ft , OneOfDict <- tfIntDict it           = mkUnaryPrimFun TCeil
 
 mkPrimFun (PrimAtan2 ft) | OneOfDict <- tfFloatDict ft                = mkBinaryPrimFun TAtan2
-mkPrimFun (PrimIsNaN _)                                               = undefined
-mkPrimFun (PrimIsInfinite _)                                          = undefined
+mkPrimFun (PrimIsNaN ft) | OneOfDict <- tfFloatDict ft                = mkUnaryPrimFun TIsNan
+mkPrimFun (PrimIsInfinite ft) | OneOfDict <- tfFloatDict ft           = mkUnaryPrimFun TIsInf
 
 mkPrimFun (PrimLt st) | OneOfDict <- tfOrdDict st                     = mkBinaryPrimFun TLess
 mkPrimFun (PrimGt st) | OneOfDict <- tfOrdDict st                     = mkBinaryPrimFun TGreater
@@ -447,8 +443,10 @@ mkPrimFun (PrimFromIntegral it nt)
   | TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType (IntegralNumType it)))
   , TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType nt))
                                                                       = mkUnaryPrimFun TCast
-
-mkPrimFun (PrimToFloating _ _)                                        = undefined
+mkPrimFun (PrimToFloating nt ft)                                      
+  | TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType nt))
+  ,  TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType (FloatingNumType ft)))
+                                                                      = mkUnaryPrimFun TCast
 
 mkUnaryPrimFun :: TensorOp (In sh a -> Out sh b -> ()) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh b) -> OperationAcc TensorOp env ()
 mkUnaryPrimFun op env exp aOut@(ArgArray _ (ArrayR sh _) gv _)
