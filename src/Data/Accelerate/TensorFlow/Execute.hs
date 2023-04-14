@@ -4,9 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-
-
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -17,7 +14,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
 
 module Data.Accelerate.TensorFlow.Execute where
 import Data.Array.Accelerate.Backend
@@ -213,9 +209,12 @@ executeKernel env (TensorConstant st s (Var _ idx))
   let build = Build $ TF.fill (TF.vector sh) (TF.scalar (toType64' st s))
   liftIO $ writeIORef ref build
   return TupRunit
+executeKernel _ (TensorConstant _ _ _) = error "impossible"
+
 executeKernel env (TensorVar st (Var _ inIdx) outVar)
   | Scalar _ s <- prj' inIdx env
   = executeKernel env (TensorConstant st s outVar)
+executeKernel _ (TensorVar _ _ _) = error "impossible"
 
 executeKernel env (TensorId (Var _ inIdx) (Var _ outIdx))                                    = executeUnaryKernel env inIdx outIdx id
 executeKernel env (TensorSelect (Var _ inIdx1) (Var _ inIdx2) (Var _ inIdx3) (Var _ outIdx)) = --do liftIO $ putStrLn "select"
@@ -258,6 +257,7 @@ executeKernel env (TensorAtanh (Var _ inIdx) (Var _ outIdx))                    
 executeKernel env (TensorExp (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel env inIdx outIdx TF.exp
 executeKernel env (TensorSqrt (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel env inIdx outIdx TF.sqrt
 executeKernel env (TensorLog (Var _ inIdx) (Var _ outIdx))                                   = executeUnaryKernel env inIdx outIdx TF.log
+executeKernel env (TensorPow (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                   = executeBinaryKernel env inIdx1 inIdx2 outIdx TF.pow
 executeKernel env (TensorLog1p (Var _ inIdx) (Var _ outIdx))                                 = executeUnaryKernel env inIdx outIdx TF.log1p
 
 executeKernel env (TensorAtan2 (Var _ inIdx1) (Var _ inIdx2) (Var _ outIdx))                 = executeBinaryKernel env inIdx1 inIdx2 outIdx TF.atan2
@@ -277,7 +277,6 @@ executeKernel env (TensorLogicalNot (Var _ inIdx) (Var _ outIdx))               
 
 executeKernel env (TensorCast (Var _ inIdx) (Var _ outIdx))                                  = executeUnaryKernel env inIdx outIdx TF.cast
 
-executeKernel _ _ = error "impossible"
 
 equalBinaryDimensions :: TensorEnv env -> Idx env (Buffer a) -> Idx env (Buffer a) -> Idx env (Buffer a) -> IO ()
 equalBinaryDimensions env inIdx1 inIdx2 outIdx
