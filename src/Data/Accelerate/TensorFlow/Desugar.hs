@@ -53,7 +53,7 @@ import Data.Array.Accelerate.AST.Environment
 import Data.Array.Accelerate.Representation.Ground ( buffersR )
 import Data.Array.Accelerate.Trafo.Desugar ( desugarAlloc )
 import Data.Array.Accelerate.Trafo.Exp.Substitution
-    ( weakenVars, SinkExp(weakenE) )
+    ( weakenVars, SinkExp(weakenE), rebuildNoArrayInstr )
 import Data.Type.Equality ( type (:~:)(Refl) )
 import Data.Array.Accelerate.Representation.Shape
     ( dim1, shapeType, ShapeR(..), DIM1 )
@@ -81,6 +81,7 @@ import Data.Accelerate.TensorFlow.Operation
                TLogicalNot),
       ScatterFun(ScatterFunMin, ScatterFunAdd) )
 import Data.Array.Accelerate.Interpreter (evalMinBound, evalPi, evalMaxBound)
+import Data.Array.Accelerate.Representation.Slice
 
 instance DesugarAcc TensorOp where
   mkMap (ArgFun (Lam lhs (Body body))) (ArgArray _ (ArrayR _ t) _ gvb) aOut =
@@ -244,6 +245,16 @@ mkMapF env (FromIndex sh exp1 exp2) aOut
   , DeclareVars lhs' w' k' <- declareVars $ TupRsingle scalarTypeInt
   = mkMapF env (Let lhs exp1 (Let lhs' (weakenE w exp2) (fromIndex sh (k w') (k' weakenId)))) aOut
 
+mkMapF env (IndexSlice slix exp1 exp2) aOut
+  | DeclareVars lhs w k <- declareVars $ sliceEltR slix
+  , DeclareVars lhs' w' k' <- declareVars $ shapeType (sliceDomainR slix)
+  = mkMapF env (Let lhs exp1 (Let lhs' (weakenE w exp2) (indexSlice slix (k w') (k' weakenId)))) aOut
+
+mkMapF env (IndexFull slix exp1 exp2) aOut -- (kopieer vector naar matrix)
+  | DeclareVars lhs w k <- declareVars $ sliceEltR slix
+  , DeclareVars lhs' w' k' <- declareVars $ shapeType (sliceShapeR slix)
+  = mkMapF env (Let lhs exp1 (Let lhs' (weakenE w exp2) (indexFull slix (k w') (k' weakenId)))) aOut
+
 mkMapF env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
   -- -| isNotLoop exp1 -- todo add preprocess check to throw an error if theres a loop, mem access, etc.
   -- , isNotLoop exp2
@@ -320,10 +331,16 @@ mkMapF env (PrimConst (PrimMinBound bt@(IntegralBoundedType it))) aOut = mkMapF 
 mkMapF env (PrimConst (PrimMaxBound bt@(IntegralBoundedType it))) aOut = mkMapF env (Const (SingleScalarType (NumSingleType (IntegralNumType it))) (evalMaxBound bt)) aOut
 mkMapF env (PrimConst (PrimPi ft)) aOut                                = mkMapF env (Const (SingleScalarType (NumSingleType (FloatingNumType ft))) (evalPi ft)) aOut
 
--- TODO
-mkMapF _ (Foreign _ _ fallback exp) aOut = undefined -- voor een backend 1 defitie, plus fallback, dat is een expr functie die aangeroepen kan worden. Die fallback kan altijd gebruikt worden.
-mkMapF _ (IndexSlice _ _ _) _ = undefined -- vraag: wat is dit? -- backpermute (matrix slice)
-mkMapF _ (IndexFull _ _ _) _ = undefined -- vraag: wat is dit? -- andersom (kopieer vector naar matrix)
+mkMapF env (Foreign _ _ fallback exp) (ArgArray _ (ArrayR sh t) gv gvb)
+  | a <- expType exp
+  , DeclareVars lhs w k <- declareVars $ buffersR a
+  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
+    Alet (LeftHandSideWildcard TupRunit) TupRunit
+    (mkMapF (weakenEnv w env) (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId)))
+    (mkMap 
+      (ArgFun (rebuildNoArrayInstr fallback)) 
+      (ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId))
+      (ArgArray Out (ArrayR sh t) (weakenVars w gv) (weakenVars w gvb)))
 
 -- Not supported
 mkMapF _ VecPack {} _   = error "VecPack operation not supported by TensorFlow backend."
@@ -332,6 +349,12 @@ mkMapF _ Case {} _      = error "Case operation not supported by TensorFlow back
 mkMapF _ While {} _     = error "While operation not supported by TensorFlow backend."
 
 mkMapF _ _ _ = error "impossible"
+
+-- mkMapForeign :: TypeR t -> PreOpenFun NoArrayInstr () (x -> t) -> PreOpenExp (ArrayInstr env) env' x -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+-- mkMapForeign t fun exp aOut = case fun of
+--                                 Body poe -> let poe' = rebuildNoArrayInstr poe in mkMapF Empty poe' _
+--                                 Lam lhs pof -> _
+
 
 select :: TypeR t -> Arg env (In sh Word8) -> Arg env (In sh t) -> Arg env (In sh t) -> Arg env (Out sh t) -> PreOpenAcc TensorOp env ()
 select (TupRpair t1 t2) (ArgArray _ (ArrayR sh tWord8) gvIn1 gvbIn1) (ArgArray _ _ gvIn2 (TupRpair gvbIn21 gvbIn22)) (ArgArray _ _ gvIn3 (TupRpair gvbIn31 gvbIn32)) (ArgArray _ _ gvOut (TupRpair gvbOut1 gvbOut2)) =
@@ -497,6 +520,22 @@ fromIndex (ShapeRsnoc shr) (TupRpair sh (TupRsingle sz)) (TupRsingle i)
       _       -> PrimApp (PrimRem TypeInt) (Pair (Evar i) (Evar sz))
     )
 fromIndex _ _ _              = error "impossible"
+
+indexSlice :: SliceIndex slix t co sh1 -> ExpVars env' slix -> ExpVars env' sh1 -> PreOpenExp (ArrayInstr env) env' t
+indexSlice SliceNil _ _ = Nil
+indexSlice (SliceAll slix) (TupRpair slx TupRunit) (TupRpair sl (TupRsingle sz)) =
+  Pair (indexSlice slix slx sl) (Evar sz)
+indexSlice (SliceFixed slix) (TupRpair slx _) (TupRpair sl _) =
+  indexSlice slix slx sl
+indexSlice _ _ _ = error "impossible"
+
+indexFull :: SliceIndex slix sl co t -> ExpVars env' slix -> ExpVars env' sl -> PreOpenExp (ArrayInstr env) env' t
+indexFull SliceNil _ _ = Nil
+indexFull (SliceAll slix) (TupRpair slx TupRunit) (TupRpair sl (TupRsingle sz)) =
+  Pair (indexFull slix slx sl) (Evar sz)
+indexFull (SliceFixed slix) (TupRpair slz (TupRsingle sz)) sl =
+  Pair (indexFull slix slz sl) (Evar sz)
+indexFull _ _ _ = error "impossible"
 
 newtype BufferIdx benv a = BIdx (Idx benv (Buffer a))
 
