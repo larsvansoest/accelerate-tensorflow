@@ -224,7 +224,7 @@ mkExp env (Evar (Var st idx)) (ArgArray _ arrayR gv gvb@(TupRsingle (Var groundR
   = let (BIdx idx') = prj' idx env
         gvb'        = TupRsingle (Var groundR idx')
     in  Exec
-          (TId st)
+          TId
           (
             ArgArray In arrayR gv gvb' :>:
             ArgArray Out arrayR gv gvb :>:
@@ -297,7 +297,7 @@ mkExp env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t@(TupRsingle st))
     Alet (LeftHandSideWildcard TupRunit) TupRunit
     (mkExp (weakenEnv (w' .> w) env) (weakenArrayInstr (w' .> w) exp) (ArgArray Out (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId)))
     (Exec
-      (TGather st)
+      TGather
       (
         ArgArray In (ArrayR dim1 t) (TupRpair TupRunit (k w')) (TupRsingle (weaken (w' .> w) var)) :>:
         ArgArray In (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId) :>:
@@ -326,7 +326,7 @@ mkExp env (Coerce stIn stOut exp) (ArgArray _ (ArrayR sh t) gv gvb)
     Alet (LeftHandSideWildcard TupRunit) TupRunit
     (mkExp (weakenEnv w env) (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId)))
     (Exec
-      (TCast stIn stOut)
+      TCast
       ( ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId) :>:
         ArgArray Out (ArrayR sh t) (weakenVars w gv) (weakenVars w gvb) :>:
         ArgsNil)
@@ -363,93 +363,95 @@ select (TupRpair t1 t2) (ArgArray _ (ArrayR sh tWord8) gvIn1 gvbIn1) (ArgArray _
 select t@(TupRsingle s) (ArgArray _ (ArrayR sh tWord8) gvIn1 gvbIn1) (ArgArray _ _ _ gvbIn2) (ArgArray _ _ _ gvbIn3) (ArgArray _ _ gvOut gvbOut)
   | OneOfDict <- tfAllDict s
   = Exec
-    (TSelect s)
-    (ArgArray In (ArrayR sh (TupRpair tWord8 (TupRpair (TupRsingle s) (TupRsingle s)))) gvIn1 (TupRpair gvbIn1 (TupRpair gvbIn2 gvbIn3)) :>:
+    TSelect
+    (ArgArray In (ArrayR sh tWord8) gvIn1 gvbIn1 :>:
+     ArgArray In (ArrayR sh (TupRsingle s)) gvIn1 gvbIn2 :>:
+     ArgArray In (ArrayR sh (TupRsingle s)) gvIn1 gvbIn3 :>:
      ArgArray Out (ArrayR sh t) gvOut gvbOut :>:
      ArgsNil)
 select TupRunit _ _ _ _ = Return TupRunit
 select _ _ _ _ _ = error "impossible"
 
 mkPrimFun :: PrimFun (a -> t) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
-mkPrimFun (PrimAdd nt)  | OneOfDict <- tfNumDict nt = mkPrimFun'  $ TAdd (SingleScalarType (NumSingleType nt))
-mkPrimFun (PrimMul nt)  | OneOfDict <- tfNumDict nt = mkPrimFun'  $ TMul (SingleScalarType (NumSingleType nt))
-mkPrimFun (PrimSub nt)  | OneOfDict <- tfNumDict nt = mkPrimFun'  $ TSub (SingleScalarType (NumSingleType nt))
-mkPrimFun (PrimNeg nt)  | OneOfDict <- tfNum'Dict nt = mkPrimFun' $ TNeg (SingleScalarType (NumSingleType nt))
-mkPrimFun (PrimAbs nt)  | OneOfDict <- tfNum'Dict nt = mkPrimFun' $ TAbs (SingleScalarType (NumSingleType nt))
-mkPrimFun (PrimSig nt)  | OneOfDict <- tfNum'Dict nt = mkPrimFun' $ TSign (SingleScalarType (NumSingleType nt))
+mkPrimFun (PrimAdd nt)  | OneOfDict <- tfNumDict nt                   = mkBinaryPrimFun TAdd
+mkPrimFun (PrimMul nt)  | OneOfDict <- tfNumDict nt                   = mkBinaryPrimFun TMul
+mkPrimFun (PrimSub nt)  | OneOfDict <- tfNumDict nt                   = mkBinaryPrimFun TSub
+mkPrimFun (PrimNeg nt)  | OneOfDict <- tfNum'Dict nt                  = mkUnaryPrimFun TNeg
+mkPrimFun (PrimAbs nt)  | OneOfDict <- tfNum'Dict nt                  = mkUnaryPrimFun TAbs
+mkPrimFun (PrimSig nt)  | OneOfDict <- tfNum'Dict nt                  = mkUnaryPrimFun TSign
 
-mkPrimFun (PrimQuot it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkPrimFun' $ TTruncateDiv (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkPrimFun (PrimRem it)  | OneOfDict <- tfModDict it = mkPrimFun' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkPrimFun (PrimQuotRem it) = mkPrimFun2' (PrimQuot it) (PrimRem it)
+mkPrimFun (PrimQuot it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkBinaryPrimFun TTruncateDiv
+mkPrimFun (PrimRem it)  | OneOfDict <- tfModDict it                   = mkBinaryPrimFun TTruncateMod
+mkPrimFun (PrimQuotRem it)                                            = mkPrimFun2 (PrimQuot it) (PrimRem it)
 
-mkPrimFun (PrimIDiv it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkPrimFun' $ TRealDiv (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkPrimFun (PrimMod it)  | OneOfDict <- tfModDict it = mkPrimFun' $ TTruncateMod (SingleScalarType (NumSingleType (IntegralNumType it)))
+mkPrimFun (PrimIDiv it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkBinaryPrimFun TRealDiv
+mkPrimFun (PrimMod it)  | OneOfDict <- tfModDict it                   = mkBinaryPrimFun TTruncateMod
 
-mkPrimFun (PrimDivMod it) = mkPrimFun2' (PrimIDiv it) (PrimMod it)
+mkPrimFun (PrimDivMod it)                                             = mkPrimFun2 (PrimIDiv it) (PrimMod it)
 
-mkPrimFun (PrimBAnd it) | OneOfDict <- tfIntDict it = mkPrimFun' $ TBitwiseAnd (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkPrimFun (PrimBOr it)  | OneOfDict <- tfIntDict it = mkPrimFun' $ TBitwiseOr (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkPrimFun (PrimBXor it) | OneOfDict <- tfIntDict it = mkPrimFun' $ TBitwiseXor (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkPrimFun (PrimBNot it) | OneOfDict <- tfIntDict it = mkPrimFun' $ TInvert (SingleScalarType (NumSingleType (IntegralNumType it)))
-mkPrimFun (PrimBShiftL it) | OneOfDict <- tfIntDict it = undefined
-mkPrimFun (PrimBShiftR it) | OneOfDict <- tfIntDict it = undefined
-mkPrimFun (PrimBRotateL it) | OneOfDict <- tfIntDict it = undefined
-mkPrimFun (PrimBRotateR it) | OneOfDict <- tfIntDict it = undefined
-mkPrimFun (PrimPopCount it) | OneOfDict <- tfIntDict it = undefined
-mkPrimFun (PrimCountLeadingZeros it) | OneOfDict <- tfIntDict it = undefined
-mkPrimFun (PrimCountTrailingZeros it) | OneOfDict <- tfIntDict it = undefined
+mkPrimFun (PrimBAnd it) | OneOfDict <- tfIntDict it                   = mkBinaryPrimFun TBitwiseAnd
+mkPrimFun (PrimBOr it)  | OneOfDict <- tfIntDict it                   = mkBinaryPrimFun TBitwiseOr
+mkPrimFun (PrimBXor it) | OneOfDict <- tfIntDict it                   = mkBinaryPrimFun TBitwiseXor
+mkPrimFun (PrimBNot it) | OneOfDict <- tfIntDict it                   = mkUnaryPrimFun TInvert
+mkPrimFun (PrimBShiftL it) | OneOfDict <- tfIntDict it                = undefined
+mkPrimFun (PrimBShiftR it) | OneOfDict <- tfIntDict it                = undefined
+mkPrimFun (PrimBRotateL it) | OneOfDict <- tfIntDict it               = undefined
+mkPrimFun (PrimBRotateR it) | OneOfDict <- tfIntDict it               = undefined
+mkPrimFun (PrimPopCount it) | OneOfDict <- tfIntDict it               = undefined
+mkPrimFun (PrimCountLeadingZeros it) | OneOfDict <- tfIntDict it      = undefined
+mkPrimFun (PrimCountTrailingZeros it) | OneOfDict <- tfIntDict it     = undefined
 
-mkPrimFun (PrimFDiv ft) | OneOfDict <- tfNumDict (FloatingNumType ft) = mkPrimFun' $ TRealDiv (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimRecip ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TReciprocal (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimSin ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TSin (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimCos ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TCos (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimTan ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TTan (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimAsin ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TAsin (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimAcos ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TAcos (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimAtan ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TAtan (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimSinh ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TSinh (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimCosh ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TCosh (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimTanh ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TTanh (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimAsinh ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TAsinh (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimAcosh ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TAcosh (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimAtanh ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TAtanh (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimExpFloating ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TExp (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimSqrt ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TSqrt (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimLog ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TLog (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimFPow ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TPow (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimLogBase ft) | OneOfDict <- tfFloatDict ft = undefined -- mkPrimFun' $ TLog1p (SingleScalarType (NumSingleType (FloatingNumType ft)))
+mkPrimFun (PrimFDiv ft) | OneOfDict <- tfNumDict (FloatingNumType ft) = mkBinaryPrimFun TRealDiv
+mkPrimFun (PrimRecip ft) | OneOfDict <- tfFloatDict ft                = mkUnaryPrimFun TReciprocal
+mkPrimFun (PrimSin ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TSin
+mkPrimFun (PrimCos ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TCos
+mkPrimFun (PrimTan ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TTan
+mkPrimFun (PrimAsin ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TAsin
+mkPrimFun (PrimAcos ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TAcos
+mkPrimFun (PrimAtan ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TAtan
+mkPrimFun (PrimSinh ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TSinh
+mkPrimFun (PrimCosh ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TCosh
+mkPrimFun (PrimTanh ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TTanh
+mkPrimFun (PrimAsinh ft) | OneOfDict <- tfFloatDict ft                = mkUnaryPrimFun TAsinh
+mkPrimFun (PrimAcosh ft) | OneOfDict <- tfFloatDict ft                = mkUnaryPrimFun TAcosh
+mkPrimFun (PrimAtanh ft) | OneOfDict <- tfFloatDict ft                = mkUnaryPrimFun TAtanh
+mkPrimFun (PrimExpFloating ft) | OneOfDict <- tfFloatDict ft          = mkUnaryPrimFun TExp
+mkPrimFun (PrimSqrt ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TSqrt
+mkPrimFun (PrimLog ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TLog
+mkPrimFun (PrimFPow ft) | OneOfDict <- tfFloatDict ft                 = mkBinaryPrimFun TPow
+mkPrimFun (PrimLogBase ft) | OneOfDict <- tfFloatDict ft              = undefined -- mkPrimFun' $ TLog1p
 
-mkPrimFun (PrimTruncate ta tb) = undefined
-mkPrimFun (PrimRound ta tb) = undefined
-mkPrimFun (PrimFloor ta tb) = undefined
-mkPrimFun (PrimCeiling ta tb) = undefined
+mkPrimFun (PrimTruncate ta tb)                                        = undefined
+mkPrimFun (PrimRound ta tb)                                           = undefined
+mkPrimFun (PrimFloor ta tb)                                           = undefined
+mkPrimFun (PrimCeiling ta tb)                                         = undefined
 
-mkPrimFun (PrimAtan2 ft) | OneOfDict <- tfFloatDict ft = mkPrimFun' $ TAtan2 (SingleScalarType (NumSingleType (FloatingNumType ft)))
-mkPrimFun (PrimIsNaN _) = undefined
-mkPrimFun (PrimIsInfinite _) = undefined
+mkPrimFun (PrimAtan2 ft) | OneOfDict <- tfFloatDict ft                = mkBinaryPrimFun TAtan2
+mkPrimFun (PrimIsNaN _)                                               = undefined
+mkPrimFun (PrimIsInfinite _)                                          = undefined
 
-mkPrimFun (PrimLt st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TLess (SingleScalarType st)
-mkPrimFun (PrimGt st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TGreater (SingleScalarType st)
-mkPrimFun (PrimLtEq st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TLessEqual (SingleScalarType st)
-mkPrimFun (PrimGtEq st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TGreaterEqual (SingleScalarType st)
-mkPrimFun (PrimEq st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TEqual (SingleScalarType st)
-mkPrimFun (PrimNEq st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TNotEqual (SingleScalarType st)
-mkPrimFun (PrimMax st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TMaximum (SingleScalarType st)
-mkPrimFun (PrimMin st) | OneOfDict <- tfOrdDict st = mkPrimFun' $ TMinimum (SingleScalarType st)
+mkPrimFun (PrimLt st) | OneOfDict <- tfOrdDict st                     = mkBinaryPrimFun TLess
+mkPrimFun (PrimGt st) | OneOfDict <- tfOrdDict st                     = mkBinaryPrimFun TGreater
+mkPrimFun (PrimLtEq st) | OneOfDict <- tfOrdDict st                   = mkBinaryPrimFun TLessEqual
+mkPrimFun (PrimGtEq st) | OneOfDict <- tfOrdDict st                   = mkBinaryPrimFun TGreaterEqual
+mkPrimFun (PrimEq st) | OneOfDict <- tfOrdDict st                     = mkBinaryPrimFun TEqual
+mkPrimFun (PrimNEq st) | OneOfDict <- tfOrdDict st                    = mkBinaryPrimFun TNotEqual
+mkPrimFun (PrimMax st) | OneOfDict <- tfOrdDict st                    = mkBinaryPrimFun TMaximum
+mkPrimFun (PrimMin st) | OneOfDict <- tfOrdDict st                    = mkBinaryPrimFun TMinimum
 
-mkPrimFun PrimLAnd = mkPrimFun' TLogicalAnd
-mkPrimFun PrimLOr = mkPrimFun' TLogicalOr
-mkPrimFun PrimLNot = mkPrimFun' TLogicalNot
+mkPrimFun PrimLAnd                                                    = mkBinaryPrimFun TLogicalAnd
+mkPrimFun PrimLOr                                                     = mkBinaryPrimFun TLogicalOr
+mkPrimFun PrimLNot                                                    = mkUnaryPrimFun TLogicalNot
 
 mkPrimFun (PrimFromIntegral it nt)
   | TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType (IntegralNumType it)))
   , TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType nt))
-  = mkPrimFun' $ TCast (SingleScalarType (NumSingleType (IntegralNumType it))) (SingleScalarType (NumSingleType nt))
+                                                                      = mkUnaryPrimFun TCast
 
-mkPrimFun (PrimToFloating _ _) = undefined
+mkPrimFun (PrimToFloating _ _)                                        = undefined
 
-mkPrimFun' :: TensorOp (In sh a -> Out sh b -> ()) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh b) -> OperationAcc TensorOp env ()
-mkPrimFun' op env exp aOut@(ArgArray _ (ArrayR sh _) gv _)
+mkUnaryPrimFun :: TensorOp (In sh a -> Out sh b -> ()) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' a -> Arg env (Out sh b) -> OperationAcc TensorOp env ()
+mkUnaryPrimFun op env exp aOut@(ArgArray _ (ArrayR sh _) gv _)
  | a <- expType exp
  , DeclareVars lhs w k <- declareVars $ buffersR a
  = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
@@ -467,8 +469,53 @@ mkPrimFun' op env exp aOut@(ArgArray _ (ArrayR sh _) gv _)
       ArgsNil
     )
 
-mkPrimFun2' :: PrimFun ((a, a) -> a) -> PrimFun ((a, a) -> a) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' (a, a) -> Arg env (Out sh (a, a)) -> OperationAcc TensorOp env ()
-mkPrimFun2' fun1 fun2 env exp (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2)) =
+mkBinaryPrimFun :: TensorOp (In sh a -> In sh b -> Out sh c -> ()) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' (a, b) -> Arg env (Out sh c) -> OperationAcc TensorOp env ()
+mkBinaryPrimFun op env exp aOut@(ArgArray _ (ArrayR sh _) gv _)
+ | t@(TupRpair a b) <- expType exp
+ , DeclareVars lhs w k <- declareVars $ buffersR t
+ = let TupRpair k1 k2 = k weakenId in
+   aletUnique lhs (desugarAlloc (ArrayR sh t) (fromGrounds gv)) $
+   Alet (LeftHandSideWildcard TupRunit) TupRunit
+   (mkExp -- flatten higher-order expression
+     (weakenEnv w env)
+     (weakenArrayInstr w exp)
+     (ArgArray Out (ArrayR sh t) (weakenVars w gv) (k weakenId))
+   ) $
+   Exec -- apply method to the result
+    op
+    (
+      ArgArray In (ArrayR sh a) (weakenVars w gv) k1 :>:
+      ArgArray In (ArrayR sh b) (weakenVars w gv) k2 :>:
+      weaken w aOut :>:
+      ArgsNil
+    )
+mkBinaryPrimFun _ _ _ _ = error "impossible"
+
+mkTernaryPrimFun :: TensorOp (In sh a -> In sh b -> In sh c -> Out sh d -> ()) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' (a, (b, c)) -> Arg env (Out sh d) -> OperationAcc TensorOp env ()
+mkTernaryPrimFun op env exp aOut@(ArgArray _ (ArrayR sh _) gv _)
+ | t@(TupRpair a (TupRpair b c)) <- expType exp
+ , DeclareVars lhs w k <- declareVars $ buffersR t
+ = let TupRpair k1 (TupRpair k2 k3) = k weakenId in
+   aletUnique lhs (desugarAlloc (ArrayR sh t) (fromGrounds gv)) $
+   Alet (LeftHandSideWildcard TupRunit) TupRunit
+   (mkExp -- flatten higher-order expression
+     (weakenEnv w env)
+     (weakenArrayInstr w exp)
+     (ArgArray Out (ArrayR sh t) (weakenVars w gv) (k weakenId))
+   ) $
+   Exec -- apply method to the result
+    op
+    (
+      ArgArray In (ArrayR sh a) (weakenVars w gv) k1 :>:
+      ArgArray In (ArrayR sh b) (weakenVars w gv) k2 :>:
+      ArgArray In (ArrayR sh c) (weakenVars w gv) k3 :>:
+      weaken w aOut :>:
+      ArgsNil
+    )
+mkTernaryPrimFun _ _ _ _ = error "impossible"
+
+mkPrimFun2 :: PrimFun ((a, a) -> a) -> PrimFun ((a, a) -> a) -> BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' (a, a) -> Arg env (Out sh (a, a)) -> OperationAcc TensorOp env ()
+mkPrimFun2 fun1 fun2 env exp (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair gvb1 gvb2)) =
   Alet (LeftHandSideWildcard TupRunit) TupRunit
   (mkPrimFun
     fun1
@@ -482,13 +529,18 @@ mkPrimFun2' fun1 fun2 env exp (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRp
     exp
     (ArgArray Out (ArrayR sh t2) gv gvb2)
   )
-mkPrimFun2' _ _ _ _ _ = error "impossible"
+mkPrimFun2 _ _ _ _ _ = error "impossible"
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
 booleanMask t@(TupRsingle s) (ArgArray _ _ gv gvbIn2) gvbIn1 gvbOut
   | OneOfDict <- tfAllDict s
-  = Exec (TBooleanMask s) (ArgArray In (ArrayR dim1 (TupRpair t (TupRsingle scalarTypeWord8))) gv (TupRpair gvbIn1 gvbIn2) :>: ArgArray Out (ArrayR dim1 t) gv gvbOut :>: ArgsNil)
+  = Exec 
+      TBooleanMask 
+      (ArgArray In (ArrayR dim1 t) gv gvbIn1 :>:
+       ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) gv gvbIn2 :>: 
+       ArgArray Out (ArrayR dim1 t) gv gvbOut :>:
+       ArgsNil)
 booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit
  (booleanMask t1 aOut gvbIn1 gvbOut1)
  (booleanMask t2 aOut gvbIn2 gvbOut2)
