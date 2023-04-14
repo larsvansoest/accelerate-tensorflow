@@ -140,6 +140,7 @@ instance IsKernel TensorKernel where
   compileKernel _ _ _ = error "impossible, did you use SequentialSchedule?"
 
 instance PrettyKernel TensorKernel where
+  prettyKernel :: PrettyKernelStyle TensorKernel
   prettyKernel = PrettyKernelBody True $ \_ _ -> ""
 
 compileOperation :: TensorOp args -> Args env args -> TensorKernel env

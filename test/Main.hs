@@ -31,14 +31,24 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 --            y = map (Data.Array.Accelerate.fromIndex (shape x)) x
 --        in putStrLn $ show $ run @TensorFlow y
 
-main :: IO ()
-main = defaultMain tests
+-- main :: IO ()
+-- main = defaultMain tests
 
 -- main :: IO ()
 -- main = defaultMain $ testGroup "generate"
 --   [
---     testCase "generate" $ assertAcc (generate (I1 10) (\(I1 i) -> fromIntegral $ i + 1) :: Acc (Array DIM1 Int64))
+--     testCase "generate" $ assertAcc (generate (I2 5 10) (\(I2 i j) -> fromIntegral $ i * j + i) :: Acc (Array DIM2 Int64))
 --   ]
+
+main :: IO ()
+main = do 
+  let acc = init (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))
+  putStrLn $ test @UniformScheduleFun @TensorKernel $ init (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))
+  defaultMain $ testGroup "generate"
+    [
+      testCase "indexed mat" $ assertAcc (indexed (use (fromList (Z:.3:.4) [0..] :: Matrix Float)))
+    ]
+
 
 tests :: TestTree
 tests = testGroup "tests"

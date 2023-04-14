@@ -7,20 +7,24 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Data.Accelerate.TensorFlow.Operation where
 
 import Data.Accelerate.TensorFlow.Type
     ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod )
 import Data.Array.Accelerate.AST.Operation
-    ( PrimBool, Mut, Out, In, NFData'(..), Var' )
+    ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Args, Arg (ArgArray), PreArgs (..), Var (..) )
 import Data.Array.Accelerate
     ( MakesILP(..),
       ShrinkArg(..),
       SLVOperation(..),
-      SimplifyOperation,
+      SimplifyOperation (..),
       PrettyOp(prettyOp),
-      EncodeOperation(..))
+      EncodeOperation(..), CopyOperation (..))
 import Data.Array.Accelerate.Pretty.Exp ( Adoc )
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Labels (LabelledArg(..))
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
@@ -28,6 +32,12 @@ import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
 import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarConst, Builder, encodeScalarType)
 import Data.Array.Accelerate.Representation.Shape (DIM1)
 import Data.Array.Accelerate.Type (ScalarType)
+import Data.Array.Accelerate.Analysis.Match ((:~:) (..))
+import Data.Array.Accelerate.Array.Buffer (Buffers, Buffer)
+import Data.Array.Accelerate.Representation.Type (TypeR, TupR (..), Distributes (reprIsSingle))
+import Data.Array.Accelerate.Representation.Array (ArrayR(..))
+import Data.Text.Prettyprint.Doc ((<+>))
+import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
 
 data TensorOp op where
   TConstant    :: OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())
@@ -154,12 +164,78 @@ instance EncodeOperation TensorOp where
 
 instance PrettyOp TensorOp where
   prettyOp :: TensorOp t -> Adoc
-  prettyOp _ = "TensorOp"
+  prettyOp = \case 
+    TConstant st _ -> "TConstant" <+> prettyScalarType st
+    TVar st -> "TVar" <+> prettyScalarType st
+    TId -> "TId"
+    TSelect -> "TSelect"
+    TGather -> "TGather"
+    TWhere -> "TWhere"
+    TBooleanMask -> "TBooleanMask"
+    TCast -> "TCast"
+    TAdd -> "TAdd"
+    TMul -> "TMul"
+    TSub -> "TSub"
+    TNeg -> "TNeg"
+    TAbs -> "TAbs"
+    TSign -> "TSign"
+    TTruncateDiv -> "TTruncateDiv"
+    TTruncateMod -> "TTruncateMod"
+    TRealDiv -> "TRealDiv"
+    TBitwiseAnd -> "TBitwiseAnd"
+    TBitwiseOr -> "TBitwiseOr"
+    TBitwiseXor -> "TBitwiseXor"
+    TInvert -> "TInvert"
+    TReciprocal -> "TReciprocal"
+    TSin -> "TSin"
+    TCos -> "TCos"
+    TTan -> "TTan"
+    TAsin -> "TAsin"
+    TAcos -> "TAcos"
+    TAtan -> "TAtan"
+    TSinh -> "TSinh"
+    TCosh -> "TCosh"
+    TTanh -> "TTanh"
+    TAsinh -> "TAsinh"
+    TAcosh -> "TAcosh"
+    TAtanh -> "TAtanh"
+    TSqrt -> "TSqrt"
+    TExp -> "TExp"
+    TLog -> "TLog"
+    TPow -> "TPow"
+    TLog1p -> "TLog1p"
+    TAtan2 -> "TAtan2"
+    TLess -> "TLess"
+    TGreater -> "TGreater"
+    TLessEqual -> "TLessEqual"
+    TGreaterEqual -> "TGreaterEqual"
+    TEqual -> "TEqual"
+    TNotEqual -> "TNotEqual"
+    TMaximum -> "TMaximum"
+    TMinimum -> "TMinimum"
+    TLogicalAnd -> "TLogicalAnd"
+    TLogicalOr -> "TLogicalOr"
+    TLogicalNot -> "TLogicalNot"
+    TTensorScatter _ -> "TTensorScatter"
 
 instance NFData' TensorOp where
   rnf' !_ = ()
 
 instance SimplifyOperation TensorOp where
+  -- detectCopy :: (forall t t'. GroundVars env t -> GroundVars env t' -> Maybe (t :~: t')) -> TensorOp op -> Args env op -> [CopyOperation env]
+  -- detectCopy _ TId (ArgArray _ (ArrayR _ t) _ gvbIn :>: ArgArray _ _ _ gvbOut :>: ArgsNil)  = copyOperation t gvbIn gvbOut
+  -- detectCopy _ _ _ = []
+
+copyOperation :: TypeR e -> GroundVars env (Buffers e) -> GroundVars env (Buffers e) -> [CopyOperation env]
+copyOperation _ TupRunit _ = []
+copyOperation (TupRsingle (st :: ScalarType e)) (TupRsingle (Var _ idx1)) (TupRsingle (Var _ idx2)) 
+  | Refl <- reprIsSingle @ScalarType @e @Buffer st
+  = [CopyOperation idx1 idx2]
+copyOperation (TupRpair t1 t2) (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) 
+  = copyOperation t1 gvbIn1 gvbOut1 ++ copyOperation t2 gvbIn2 gvbOut2
+copyOperation _ _ _ = error "impossible"
+
+-- vraag woensdag: dit werkt niet want ik krijg een clustering issue
 
 instance SLVOperation TensorOp where
   slvOperation _ = Nothing

@@ -22,7 +22,6 @@ import Data.Array.Accelerate.AST.Schedule.Sequential
     ( expType,
       Var(Var),
       PreArgs(ArgsNil, (:>:)),
-      ExpVars,
       GroundsR,
       GroundR(GroundRbuffer, GroundRscalar),
       ArrayInstr(..),
@@ -55,7 +54,6 @@ import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Environment
     ( prj', Env(Push, Empty), update' )
 import Control.Concurrent ( MVar, putMVar )
-import Data.Array.Accelerate.AST.Idx ( Idx )
 import Data.Array.Accelerate.AST.Kernel
     ( OpenKernelFun(..),
       KernelFun,
@@ -76,7 +74,6 @@ import Unsafe.Coerce (unsafeCoerce)
 import Data.Array.Accelerate.AST.Operation (GroundVars, PrimBool, Vars)
 import Prelude hiding (exp)
 import Data.Data
-import Data.Array.Accelerate.AST.Schedule.Uniform (BaseVars)
 
 -- detect copy implementeren voor het versimpelen voor programma's
 data TensorFlow where
@@ -109,13 +106,13 @@ input TupRunit _ = TupRunit
 type TensorEnv = Env TensorElement
 
 data TensorValue a where
-  Build :: TF.Tensor TF.Build a -> TensorValue a
-  Vector :: S.Vector a -> TensorValue a
-  Nil :: TensorValue a
+  Build  :: TF.Shape -> TF.Tensor TF.Build a -> TensorValue a
+  Vector :: TF.Shape -> S.Vector a -> TensorValue a
+  Nil    :: TF.Shape -> TensorValue a
 
 data TensorElement a where
   Scalar :: TypeR a -> a -> TensorElement a
-  Tensor :: VectorType (Type64 a) => ScalarType a -> TF.Shape -> IORef (TensorValue (Type64 a)) -> TensorElement (Buffer a)
+  Tensor :: VectorType (Type64 a) => ScalarType a -> IORef (TensorValue (Type64 a)) -> TensorElement (Buffer a)
 
 type TensorElements = TupR TensorElement
 
@@ -150,8 +147,8 @@ executeSeqSchedule env (Alloc shR st vars)
   | VectorTypeDict <- tfVectorTypeDict st
   = do
   sh <- liftIO $ getShape env shR vars
-  ref <- liftIO $ newIORef Nil
-  return $ TupRsingle $ Tensor st (TF.Shape sh) ref
+  ref <- liftIO $ newIORef (Nil (TF.Shape sh))
+  return $ TupRsingle $ Tensor st ref
 
 executeSeqSchedule _ (Use (st :: ScalarType e) n buffer)
   | VectorTypeDict <- tfVectorTypeDict st
@@ -160,34 +157,38 @@ executeSeqSchedule _ (Use (st :: ScalarType e) n buffer)
       cb = unsafeCoerce buffer
   let list :: [Type64 e]
       list = bufferToList (toType64 st) n cb
-  ref <- liftIO $ newIORef $ Build $ TF.vector list
-  return $ TupRsingle $ Tensor st (TF.Shape [fromIntegral n]) ref
+  ref <- liftIO $ newIORef $ Build (TF.Shape [fromIntegral n]) (TF.vector list)
+  return $ TupRsingle $ Tensor st ref
 
 executeSeqSchedule env (Unit (Var st idx))
   | (Scalar _ t) <- prj' idx env
   , VectorTypeDict <- tfVectorTypeDict st
-  = do ref <- liftIO $ newIORef $ Build $ TF.scalar (toType64' st t)
-       return $ TupRsingle $ Tensor st (TF.Shape []) ref
-
+  = do ref <- liftIO $ newIORef $ Build (TF.Shape []) (TF.scalar (toType64' st t))
+       return $ TupRsingle $ Tensor st ref
 executeSeqSchedule _ (Unit _) = error "impossible"
 
-executeSeqSchedule _ (Acond var ss ss') = undefined
+executeSeqSchedule env (Acond (Var _ condIdx) exp1 exp2)
+  | (Scalar _ cond) <- prj' condIdx env
+  = if toBool cond
+      then executeSeqSchedule env exp1
+      else executeSeqSchedule env exp2
 
-executeSeqSchedule env (Awhile _ cond exp vars) = undefined -- executeAwhile env cond exp vars
+executeSeqSchedule env (Awhile _ cond exp vars) = executeAwhile env cond exp vars -- executeAwhile env cond exp vars
 
 executeAwhile :: TensorEnv env -> SeqScheduleFun TensorKernel env (t -> PrimBool) -> SeqScheduleFun TensorKernel env (t -> t) -> GroundVars env t -> TF.Session (TensorElements t)
-executeAwhile env cond@(Slam condLhs (Sbody condSched)) exp@(Slam expLhs (Sbody expSched)) vars =
-  do let t = mapTupR (\(Var _ idx) -> prj' idx env) vars
-     liftIO $ runTensorElements t
-     TupRsingle condElement <- executeSeqSchedule (push env (condLhs, t)) condSched
-     liftIO $ runTensorElement condElement
-     condValue <- liftIO $ returnTensorElement condElement
-     if toBool condValue
-      then do t' <- executeSeqSchedule (push env (expLhs, t)) expSched
-              let env' = updates env vars t'
-              executeAwhile env' cond exp vars
-      else return t
-executeAwhile _ _ _ _ = error "impossible" -- vraag vrijdag: problemen met NIL ref en loops.
+executeAwhile env cond body vars = let t = mapTupR (\(Var _ idx) -> prj' idx env) vars in executeAwhile' env cond body t
+
+executeAwhile' :: TensorEnv env -> SeqScheduleFun TensorKernel env (t -> PrimBool) -> SeqScheduleFun TensorKernel env (t -> t) -> TensorElements t -> TF.Session (TensorElements t)
+executeAwhile' env cond@(Slam condLhs (Sbody condSched)) body@(Slam expLhs (Sbody expSched)) t = do
+  liftIO $ runTensorElements t
+  TupRsingle condElement <- executeSeqSchedule (push env (condLhs, t)) condSched
+  liftIO $ runTensorElement condElement
+  condValue <- liftIO $ returnTensorElement condElement
+  if toBool condValue
+   then do t' <- executeSeqSchedule (push env (expLhs, t)) expSched
+           executeAwhile' env cond body t'
+   else return t
+executeAwhile' _ _ _ _ = error "impossible"
 
 updates :: TensorEnv env -> GroundVars env t -> TensorElements t -> TensorEnv env
 updates env TupRunit _ = env
@@ -205,11 +206,10 @@ executeOpenKernelFun env' _ (KernelFunBody kernel) ArgsNil                      
 
 executeKernel :: TensorEnv env -> TensorKernel env -> TF.Session (TensorElements ())
 executeKernel env (TensorConstant (TensorArg shR shVars st (Var _ idx)) s)
-  | Tensor _ _ ref <- prj' idx env
+  | Tensor _ ref <- prj' idx env
   = do
   sh <- liftIO $ getShape env shR shVars
-  let build = Build $ TF.fill (TF.vector sh) (TF.scalar (toType64' st s))
-  liftIO $ writeIORef ref build
+  liftIO $ writeIORef ref $ Build (TF.Shape sh) $ TF.fill (TF.vector sh) (TF.scalar (toType64' st s))
   return TupRunit
 executeKernel _ (TensorConstant _ _)                  = error "impossible"
 
@@ -274,50 +274,50 @@ executeKernel env (TensorLogicalOr aIn1 aIn2 aOut)    = executeBinaryKernel env 
 executeKernel env (TensorLogicalNot aIn aOut)         = executeUnaryKernel env aIn aOut (TF.cast . TF.logicalNot . TF.cast)
 
 executeUnaryKernel :: TensorEnv env -> TensorArg env sh a -> TensorArg env sh' b -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b)) -> TF.Session (TensorElements ())
-executeUnaryKernel env (TensorArg _ _ _ (Var _ inIdx)) (TensorArg shR shVars _ (Var _ outIdx)) tfOp
-  | Tensor _ sh1 inRef1 <- prj' inIdx env
-  , Tensor _ _ outRef <- prj' outIdx env
+executeUnaryKernel env (TensorArg inShR inShVars _ (Var _ inIdx)) (TensorArg outShR outShVars _ (Var _ outIdx)) tfOp
+  | Tensor stIn inRef1 <- prj' inIdx env
+  , Tensor _ outRef <- prj' outIdx env
   = do
-    inValue <- liftIO $ readIORef inRef1
-    let inTensor = buildTensorValue sh1 inValue
-    sh <- liftIO $ getShape env shR shVars
+    inSh <- liftIO $ getShape env inShR inShVars
+    inTensor <- buildTensor stIn (TF.Shape inSh) inRef1
 
-    liftIO $ writeIORef outRef $ Build $ TF.ensureShape (TF.Shape sh) $ tfOp inTensor
+    outSh <- liftIO $ getShape env outShR outShVars
+    liftIO $ writeIORef outRef $ Build (TF.Shape outSh) $ TF.ensureShape (TF.Shape outSh) $ tfOp inTensor
     return TupRunit
 executeUnaryKernel _ _ _ _ = error "impossible"
 
 executeBinaryKernel :: TensorEnv env -> TensorArg env sh a -> TensorArg env sh' b -> TensorArg env sh'' c -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b) -> TF.Tensor TF.Build (Type64 c)) -> TF.Session (TensorElements ())
-executeBinaryKernel env (TensorArg _ _ _ (Var _ inIdx1)) (TensorArg _ _ _ (Var _ inIdx2)) (TensorArg shR shVars _ (Var _ outIdx)) tfOp
-  | Tensor _ sh1 inRef1 <- prj' inIdx1 env
-  , Tensor _ sh2 inRef2 <- prj' inIdx2 env
-  , Tensor _ _ outRef <- prj' outIdx env
+executeBinaryKernel env (TensorArg inShR1 inShVars1 _ (Var _ inIdx1)) (TensorArg inShR2 inShVars2 _ (Var _ inIdx2)) (TensorArg outShR outShVars _ (Var _ outIdx)) tfOp
+  | Tensor stIn1 inRef1 <- prj' inIdx1 env
+  , Tensor stIn2 inRef2 <- prj' inIdx2 env
+  , Tensor _ outRef <- prj' outIdx env
   = do
-    inValue1 <- liftIO $ readIORef inRef1
-    inValue2 <- liftIO $ readIORef inRef2
-    let inTensor1 = buildTensorValue sh1 inValue1
-    let inTensor2 = buildTensorValue sh2 inValue2
-    sh <- liftIO $ getShape env shR shVars
+    inSh1 <- liftIO $ getShape env inShR1 inShVars1
+    inTensor1 <- buildTensor stIn1 (TF.Shape inSh1) inRef1
+    inSh2 <- liftIO $ getShape env inShR2 inShVars2
+    inTensor2 <- buildTensor stIn2 (TF.Shape inSh2) inRef2
 
-    liftIO $ writeIORef outRef $ Build $ TF.ensureShape (TF.Shape sh) $ tfOp inTensor1 inTensor2
+    outSh <- liftIO $ getShape env outShR outShVars
+    liftIO $ writeIORef outRef $ Build (TF.Shape outSh) $ TF.ensureShape (TF.Shape outSh) $ tfOp inTensor1 inTensor2
     return TupRunit
 executeBinaryKernel _ _ _ _ _ = error "impossible"
 
 executeTernaryKernel :: TensorEnv env -> TensorArg env sh a -> TensorArg env sh' b -> TensorArg env sh'' c -> TensorArg env sh''' d -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b) -> TF.Tensor TF.Build (Type64 c) -> TF.Tensor TF.Build (Type64 d)) -> TF.Session (TensorElements ())
-executeTernaryKernel env (TensorArg _ _ _ (Var _ inIdx1)) (TensorArg _ _ _ (Var _ inIdx2)) (TensorArg _ _ _ (Var _ inIdx3)) (TensorArg shR shVars _ (Var _ outIdx)) tfOp
-  | Tensor _ sh1 inRef1 <- prj' inIdx1 env
-  , Tensor _ sh2 inRef2 <- prj' inIdx2 env
-  , Tensor _ sh3 inRef3 <- prj' inIdx3 env
-  , Tensor _ _ outRef <- prj' outIdx env
+executeTernaryKernel env (TensorArg inShR1 inShVars1 _ (Var _ inIdx1)) (TensorArg inShR2 inShVars2 _ (Var _ inIdx2)) (TensorArg inShR3 inShVars3 _ (Var _ inIdx3)) (TensorArg outShR outShVars _ (Var _ outIdx)) tfOp
+  | Tensor stIn1 inRef1 <- prj' inIdx1 env
+  , Tensor stIn2 inRef2 <- prj' inIdx2 env
+  , Tensor stIn3 inRef3 <- prj' inIdx3 env
+  , Tensor _ outRef <- prj' outIdx env
   = do
-    inValue1 <- liftIO $ readIORef inRef1
-    inValue2 <- liftIO $ readIORef inRef2
-    inValue3 <- liftIO $ readIORef inRef3
-    let inTensor1 = buildTensorValue sh1 inValue1
-    let inTensor2 = buildTensorValue sh2 inValue2
-    let inTensor3 = buildTensorValue sh3 inValue3
-    sh <- liftIO $ getShape env shR shVars
+    inSh1 <- liftIO $ getShape env inShR1 inShVars1
+    inTensor1 <- buildTensor stIn1 (TF.Shape inSh1) inRef1
+    inSh2 <- liftIO $ getShape env inShR2 inShVars2
+    inTensor2 <- buildTensor stIn2 (TF.Shape inSh2) inRef2
+    inSh3 <- liftIO $ getShape env inShR3 inShVars3
+    inTensor3 <- buildTensor stIn3 (TF.Shape inSh3) inRef3
 
-    liftIO $ writeIORef outRef $ Build $ TF.ensureShape (TF.Shape sh) $ tfOp inTensor1 inTensor2 inTensor3
+    outSh <- liftIO $ getShape env outShR outShVars
+    liftIO $ writeIORef outRef $ Build (TF.Shape outSh) $ TF.ensureShape (TF.Shape outSh) $ tfOp inTensor1 inTensor2 inTensor3
     return TupRunit
 executeTernaryKernel _ _ _ _ _ _ = error "impossible"
 
@@ -338,29 +338,42 @@ push _ _                                        = error "Tuple mismatch"
 evalArrayInstr :: TensorEnv env -> ArrayInstr env (s -> t) -> s -> TF.SessionT IO t
 evalArrayInstr env (Index (Var _ idx)) s     = case prj' idx env of
   Scalar _ _ -> error "impossible"
-  Tensor st _ ref -> do
+  Tensor st ref -> do
     tensorV <- liftIO $ readIORef ref
     case tensorV of
-      Build _ -> error "impossible"
-      Vector vec -> return $ fromType64' st $ vec S.! s
-      Nil -> error "impossible"
+      Build sh build -> do vec <- TF.runSession $ TF.run build
+                           liftIO $ writeIORef ref $ Vector sh vec
+                           return $ fromType64' st $ vec S.! s
+      Vector _ vec -> return $ fromType64' st $ vec S.! s
+      Nil _ -> error "impossible"
 evalArrayInstr env (Parameter (Var _ idx)) _ = case prj' idx env of
   Scalar _ e -> return e
   Tensor {} -> error "impossible"
 
 toBuffer :: forall a. (VectorType (Type64 a)) => ScalarType a -> IORef (TensorValue (Type64 a)) -> IO (Buffer a)
 toBuffer st ref = do
-  Vector (vec :: S.Vector (Type64 a)) <- readIORef ref
-  let n = S.length vec
-  (mutableBuffer :: MutableBuffer a) <- newBuffer st n
+  Vector _ (vec :: S.Vector (Type64 a)) <- readIORef ref
+  (mutableBuffer :: MutableBuffer a) <- newBuffer st (S.length vec)
   liftIO $ S.iforM_ vec (\i a -> writeBuffer st mutableBuffer i (fromType64' st a))
   return $ unsafeFreezeBuffer mutableBuffer
 
 -- | convert a tensorvalue to a build tensor
-buildTensorValue :: VectorType a => TF.Shape -> TensorValue a -> TF.Tensor TF.Build a
-buildTensorValue _ Nil           = error "can not build TNil"
-buildTensorValue _ (Build build) = build
-buildTensorValue sh (Vector vec) = TF.constant sh $ S.toList vec
+buildTensor :: (VectorType (Type64 a)) => ScalarType a -> TF.Shape -> IORef (TensorValue (Type64 a)) -> TF.Session (TF.Tensor TF.Build (Type64 a))
+buildTensor _ (TF.Shape sh) ref = do
+  value <- liftIO $ readIORef ref
+  case value of 
+    Build (TF.Shape sh') build -> if length sh == length sh' 
+      then return build 
+      else do
+        liftIO $ putStrLn $ "reshaping " ++ show sh ++ " to " ++ show sh'
+        let build' = TF.reshape build (TF.vector sh)
+        liftIO $ writeIORef ref $ Build (TF.Shape sh) build'
+        return build'
+    Vector _ vec -> do
+      let build = TF.constant (TF.Shape sh) $ S.toList vec
+      liftIO $ writeIORef ref $ Build (TF.Shape sh) build
+      return build
+    Nil _ -> error "can not build TNil"
 
 -- | convert all tensor values to vectors
 runTensorElements :: TensorElements t -> IO ()
@@ -371,7 +384,7 @@ runTensorElements (TupRpair v1 v2) = do runTensorElements v1
 
 returnTensorElement :: TensorElement a -> IO a
 returnTensorElement (Scalar _ a) = return a
-returnTensorElement (Tensor st _ ref) = toBuffer st ref
+returnTensorElement (Tensor st ref) = toBuffer st ref
 
 returnTensorElements :: TensorElements a -> IO a
 returnTensorElements TupRunit        = return ()
@@ -384,13 +397,13 @@ runTensorRef :: VectorType a => IORef (TensorValue a) -> IO ()
 runTensorRef ref = do
   value <- readIORef ref
   case value of
-    Build build -> do
+    Build sh build -> do
       vec <- TF.runSession $ TF.run build
-      writeIORef ref $ Vector vec
-    Vector _ -> return ()
-    Nil -> error "can not run NIL ref"
+      writeIORef ref $ Vector sh vec
+    Vector _ _ -> return ()
+    Nil _ -> error "can not run NIL ref"
 
 -- | convert a tensorvalue to a vector
 runTensorElement :: TensorElement t -> IO ()
 runTensorElement (Scalar _ _) = return ()
-runTensorElement (Tensor _ _ ref) = runTensorRef ref
+runTensorElement (Tensor _ ref) = runTensorRef ref
