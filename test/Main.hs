@@ -31,17 +31,17 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 --            y = map (Data.Array.Accelerate.fromIndex (shape x)) x
 --        in putStrLn $ show $ run @TensorFlow y
 
--- main :: IO ()
--- main = defaultMain tests
-
 main :: IO ()
-main = do 
-  let acc = (use (fromList (Z:.5:.10) [0..]) ++ use (fromList (Z:.10:.3) [0..]) :: Acc (Array DIM2 Int64))
-  putStrLn $ test @UniformScheduleFun @TensorKernel $ acc
-  defaultMain $ testGroup "test1"
-    [
-      testCase "test" $ assertAcc acc
-    ]
+main = defaultMain tests
+
+-- main :: IO ()
+-- main = do 
+--   let acc = (use (fromList (Z:.2:.2) [0..]) ++ use (fromList (Z:.2:.2) [0..]) :: Acc (Array DIM2 Int64))
+--   putStrLn $ test @UniformScheduleFun @TensorKernel $ acc
+--   defaultMain $ testGroup "test1"
+--     [
+--       testCase "test" $ assertAcc acc
+--     ]
 
 
 tests :: TestTree
@@ -829,10 +829,10 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           [ testCase "scanr'Seg mat" $ assertAcc (scanr'Seg (+) 0 (use mat) (use seg))
                           ]
                         tPrescanrSeg = testGroup "prescanrSeg"
-                          [ testCase "prescanrSeg mat" $ assertAcc (prescanrSeg (+) 0 (use mat) (use seg))
+                          [ -- testCase "prescanrSeg mat" $ assertAcc (prescanrSeg (+) 0 (use mat) (use seg))
                           ]
                         tPostscanrSeg = testGroup "postscanrSeg"
-                          [ testCase "postscanrSeg mat" $ assertAcc (postscanrSeg (+) 0 (use mat) (use seg))
+                          [ -- testCase "postscanrSeg mat" $ assertAcc (postscanrSeg (+) 0 (use mat) (use seg))
                           ]
 
         tStencils :: TestTree

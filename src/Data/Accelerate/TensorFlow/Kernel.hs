@@ -101,9 +101,9 @@ data TensorKernel env where
   TensorLog1p      :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
 
   -- operators from RealFrac
-  TensorRound :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
-  TensorFloor :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
-  TensorCeil  :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+  TensorRound    :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+  TensorFloor    :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+  TensorCeil     :: (OneOf TFFloat a, OneOf TFInt b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
 
   -- operators from RealFloat
   TensorAtan2      :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
@@ -203,6 +203,9 @@ compileOperation TAtan2 (aIn1 :>: aIn2 :>: aOut :>: _)                      = Te
 compileOperation TRound (aIn :>: aOut :>: _)                                = TensorRound (arg aIn) (arg aOut)
 compileOperation TFloor (aIn :>: aOut :>: _)                                = TensorFloor (arg aIn) (arg aOut)
 compileOperation TCeil (aIn :>: aOut :>: _)                                 = TensorCeil (arg aIn) (arg aOut)
+
+compileOperation TIsNan (aIn :>: aOut :>: _)                                = TensorIsNan (arg aIn) (arg aOut)
+compileOperation TIsInf (aIn :>: aOut :>: _)                                = TensorIsInf (arg aIn) (arg aOut)
 
 compileOperation TLess (aIn1 :>: aIn2 :>: aOut :>: _)                       = TensorLess (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TGreater (aIn1 :>: aIn2 :>: aOut :>: _)                    = TensorGreater (arg aIn1) (arg aIn2) (arg aOut)

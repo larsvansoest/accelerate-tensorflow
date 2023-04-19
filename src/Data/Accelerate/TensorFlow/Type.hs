@@ -242,3 +242,19 @@ zero (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   = 0
 zero (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  = 0
 zero (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) = 0
 zero (VectorScalarType _)                                            = error "not a zero type"
+
+one :: ScalarType t -> t
+one (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeInt8)))   = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeInt16)))  = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeInt32)))  = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeInt64)))  = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeWord)))   = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeWord8)))  = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeWord16))) = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeWord32))) = 1
+one (SingleScalarType (NumSingleType (IntegralNumType TypeWord64))) = 1
+one (SingleScalarType (NumSingleType (FloatingNumType TypeHalf)))   = 1
+one (SingleScalarType (NumSingleType (FloatingNumType TypeFloat)))  = 1
+one (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) = 1
+one (VectorScalarType _)                                            = error "not a one type"

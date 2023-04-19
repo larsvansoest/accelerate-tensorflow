@@ -17,7 +17,7 @@ module Data.Accelerate.TensorFlow.Operation where
 import Data.Accelerate.TensorFlow.Type
     ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod )
 import Data.Array.Accelerate.AST.Operation
-    ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Args, Arg (ArgArray), PreArgs (..), Var (..) )
+    ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Var (..), Arg (ArgArray), PreArgs ((:>:), ArgsNil), Args )
 import Data.Array.Accelerate
     ( MakesILP(..),
       ShrinkArg(..),
@@ -35,9 +35,9 @@ import Data.Array.Accelerate.Type (ScalarType)
 import Data.Array.Accelerate.Analysis.Match ((:~:) (..))
 import Data.Array.Accelerate.Array.Buffer (Buffers, Buffer)
 import Data.Array.Accelerate.Representation.Type (TypeR, TupR (..), Distributes (reprIsSingle))
-import Data.Array.Accelerate.Representation.Array (ArrayR(..))
-import Data.Text.Prettyprint.Doc ((<+>))
+import Prettyprinter ((<+>))
 import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
+import Data.Array.Accelerate.Representation.Array
 
 data TensorOp op where
   TConstant    :: OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())
@@ -168,6 +168,11 @@ instance EncodeOperation TensorOp where
     TInvert -> intHost $(hashQ ("Invert" :: String))
     TCast -> intHost $(hashQ ("Cast" :: String))
     TGather -> intHost $(hashQ ("Gather" :: String))
+    TRound -> intHost $(hashQ ("Round" :: String))
+    TFloor -> intHost $(hashQ ("Floor" :: String))
+    TCeil -> intHost $(hashQ ("Ceil" :: String))
+    TIsNan -> intHost $(hashQ ("IsNan" :: String))
+    TIsInf -> intHost $(hashQ ("IsInf" :: String))
 
 instance PrettyOp TensorOp where
   prettyOp :: TensorOp t -> Adoc
@@ -224,7 +229,12 @@ instance PrettyOp TensorOp where
     TLogicalOr -> "TLogicalOr"
     TLogicalNot -> "TLogicalNot"
     TTensorScatter _ -> "TTensorScatter"
-
+    TRound -> "TRound"
+    TFloor -> "TFloor"
+    TCeil -> "TCeil"
+    TIsNan -> "TIsNan"
+    TIsInf -> "TIsInf"
+    
 instance NFData' TensorOp where
   rnf' !_ = ()
 

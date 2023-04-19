@@ -30,7 +30,7 @@ import Data.Array.Accelerate.AST.Operation
 import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(LeftHandSideWildcard, LeftHandSideSingle) )
 import Data.Array.Accelerate.Backend
-    ( DesugarAcc(mkGenerate, mkPermute, mkMap, mkBackpermute) )
+    ( DesugarAcc(mkGenerate, mkPermute, mkMap) )
 import Data.Array.Accelerate.Type
     ( Word8,
       scalarTypeWord8,
@@ -102,14 +102,14 @@ instance DesugarAcc TensorOp where
     , DeclareVars lhs''' w''' k''' <- declareVars $ buffersR $ shapeType sh
     = aletUnique lhs (Compute (ShapeSize sh (paramsIn' $ fromGrounds gv))) $
       -- 1) Create a Tensor of flattened shape sh with only ones
-      aletUnique lhs' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars w $ fromGrounds gv)) $
+      aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeInt)) (fromGrounds (TupRpair TupRunit (k weakenId)))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
         (TConstant scalarTypeInt 1)
-        (ArgArray Out (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w' .> w) gv) (k' weakenId) :>: ArgsNil)
+        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k w')) (k' weakenId) :>: ArgsNil)
       ) $
       -- 2) Obtain a tensor of indices (tf.where returns list of indices pointing to values > 0)
-      aletUnique lhs'' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (weakenVars (w' .> w) $ fromGrounds gv)) $
+      aletUnique lhs'' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeInt)) (fromGrounds (TupRpair TupRunit (k w')))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
         TWhere
@@ -175,7 +175,7 @@ instance DesugarAcc TensorOp where
         ArgArray In (ArrayR sh t) (weakenVars (w''' .> w'' .> w' .> w) gv) (k''' weakenId) :>:
         ArgsNil
       )
-        where 
+        where
           isJust :: TypeR a -> GroundVars env (Buffers (Word8, a)) -> GroundVars env (Buffers Word8)
           isJust _ (TupRpair word8 _) = word8
           isJust _ _ = error "impossible"
@@ -288,13 +288,13 @@ mkExp env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t@(TupRsingle st))
     aletUnique lhs (Compute (ShapeSize sh (paramsIn' $ fromGrounds gv))) $
     aletUnique lhs' (desugarAlloc (ArrayR sh i) (weakenVars w $ fromGrounds gv)) $
     Alet (LeftHandSideWildcard TupRunit) TupRunit
-    (mkExp (weakenEnv (w' .> w) env) (weakenArrayInstr (w' .> w) exp) (ArgArray Out (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId)))
+    (mkExp (weakenEnv (w' .> w) env) (weakenArrayInstr (w' .> w) exp) (ArgArray Out (ArrayR dim1 i) (TupRpair TupRunit (k w')) (k' weakenId)))
     (Exec
       TGather
       (
         ArgArray In (ArrayR dim1 t) (TupRpair TupRunit (k w')) (TupRsingle (weaken (w' .> w) var)) :>:
-        ArgArray In (ArrayR sh i) (weakenVars (w' .> w) gv) (k' weakenId) :>:
-        ArgArray Out (ArrayR sh t) (weakenVars (w' .> w) gv) (weakenVars (w' .> w) gvb) :>:
+        ArgArray In (ArrayR dim1 i) (TupRpair TupRunit (k w')) (k' weakenId) :>:
+        ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k w')) (weakenVars (w' .> w) gvb) :>:
         ArgsNil
       )
     )
@@ -335,8 +335,8 @@ mkExp env (Foreign _ _ fallback exp) (ArgArray _ (ArrayR sh t) gv gvb)
   = aletUnique lhs (desugarAlloc (ArrayR sh a) (fromGrounds gv)) $
     Alet (LeftHandSideWildcard TupRunit) TupRunit
     (mkExp (weakenEnv w env) (weakenArrayInstr w exp) (ArgArray Out (ArrayR sh a) (weakenVars w gv) (k weakenId)))
-    (mkMap 
-      (ArgFun (rebuildNoArrayInstr fallback)) 
+    (mkMap
+      (ArgFun (rebuildNoArrayInstr fallback))
       (ArgArray In (ArrayR sh a) (weakenVars w gv) (k weakenId))
       (ArgArray Out (ArrayR sh t) (weakenVars w gv) (weakenVars w gvb)))
 
@@ -443,7 +443,7 @@ mkPrimFun (PrimFromIntegral it nt)
   | TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType (IntegralNumType it)))
   , TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType nt))
                                                                       = mkUnaryPrimFun TCast
-mkPrimFun (PrimToFloating nt ft)                                      
+mkPrimFun (PrimToFloating nt ft)
   | TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType nt))
   ,  TensorTypeDict <- tfTensorTypeDict (SingleScalarType (NumSingleType (FloatingNumType ft)))
                                                                       = mkUnaryPrimFun TCast
@@ -529,14 +529,15 @@ mkPrimFun2 fun1 fun2 env exp (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpa
   )
 mkPrimFun2 _ _ _ _ _ = error "impossible"
 
+
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
 booleanMask t@(TupRsingle s) (ArgArray _ _ gv gvbIn2) gvbIn1 gvbOut
   | OneOfDict <- tfAllDict s
-  = Exec 
-      TBooleanMask 
+  = Exec
+      TBooleanMask
       (ArgArray In (ArrayR dim1 t) gv gvbIn1 :>:
-       ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) gv gvbIn2 :>: 
+       ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) gv gvbIn2 :>:
        ArgArray Out (ArrayR dim1 t) gv gvbOut :>:
        ArgsNil)
 booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit
@@ -555,14 +556,14 @@ shapeSize _ _                                             = error "impossible"
 
 toIndex :: ShapeR sh -> ExpVars env' sh -> ExpVars env' sh -> PreOpenExp (ArrayInstr env) env' Int
 toIndex ShapeRz TupRunit TupRunit = Const scalarTypeInt 0
-toIndex (ShapeRsnoc shr) (TupRpair sh _) (TupRpair ix (TupRsingle i))
+toIndex (ShapeRsnoc shr) (TupRpair sh (TupRsingle sz)) (TupRpair ix (TupRsingle i))
   = PrimApp (PrimAdd (IntegralNumType TypeInt))
       (Pair
-        (toIndex shr sh ix)
         (PrimApp (PrimMul (IntegralNumType TypeInt))
           (Pair
-            (shapeSize shr sh)
-            (Evar i))))
+            (toIndex shr sh ix)
+            (Evar sz)))
+        (Evar i))
 toIndex _ _ _                     = error "impossible"
 
 fromIndex :: ShapeR sh -> ExpVars env' sh -> ExpVars env' Int -> PreOpenExp (ArrayInstr env) env' sh
