@@ -44,6 +44,7 @@ dependencies:
 - tasty-hedgehog
 - tasty-hunit
 - tasty-quickcheck
+- criterion
 
 library:
   source-dirs: src
@@ -95,6 +96,7 @@ tests:
       - tasty-hedgehog
       - tasty-hunit
       - tasty-quickcheck
+      - criterion
     when:
       - condition: flag(llvm-cpu)
         cpp-options: -DACCELERATE_LLVM_NATIVE_BACKEND

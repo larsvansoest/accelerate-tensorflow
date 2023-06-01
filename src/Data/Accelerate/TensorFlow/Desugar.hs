@@ -38,9 +38,9 @@ import Data.Array.Accelerate.Type
       IntegralType(..),
       NumType(IntegralNumType, FloatingNumType),
       SingleType(NumSingleType),
-      ScalarType(SingleScalarType), BoundedType (..) )
+      ScalarType(SingleScalarType), BoundedType (..), Int64 )
 import Data.Array.Accelerate.Representation.Array
-    ( Buffer, Buffers, ArrayR(ArrayR) )
+    ( Buffer, Buffers, ArrayR(ArrayR), Array )
 import Data.Array.Accelerate.Representation.Type
     ( Distributes(reprIsSingle),
       Distribute,
@@ -191,6 +191,57 @@ instance DesugarAcc TensorOp where
               _         -> error "primfun not yet supported"
             _ -> error "complex combination for permute not supported"
 
+add :: forall env sh. 
+       Arg env (In sh Int64) 
+    -> Arg env (In sh Int64) 
+    -> Arg env (Out sh Int64) 
+    -> OperationAcc TensorOp env ()
+add argIn1 argIn2 argOut =
+  Exec TAdd (argIn1 :>: argIn2 :>: argOut :>: ArgsNil)
+    
+
+mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) 
+  -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
+mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR _ t) gvIn gvbIn) argOut@(ArgArray _ _ _ gvbOut)
+  | DeclareVars lhs  w  k  <- declareVars $ buffersR t -- variable to new array
+  , DeclareVars lhs' w' k' <- declareVars $ buffersR t -- variable to new array
+  = let
+    sInt64 :: ScalarType Int64
+    sInt64 = SingleScalarType (NumSingleType (IntegralNumType TypeInt64))
+    in 
+    -- Allocate new array
+    aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
+    Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (Exec -- Fill new array with the number 2
+        (TConstant sInt64 2) 
+        (ArgArray Out arrayR (weakenVars w gvIn) (k weakenId) :>: ArgsNil)
+      ) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+        (Exec -- (*2) Multiply input array with new array
+          TMul
+          (ArgArray In arrayR (weakenVars w gvIn) (weakenVars w gvbIn) :>:
+           ArgArray In arrayR (weakenVars w gvIn) (k weakenId) :>:
+           weaken w argOut :>: 
+           ArgsNil
+          )
+        ) $
+        -- Allocate new array
+        aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $
+          Alet (LeftHandSideWildcard TupRunit) TupRunit
+            (Exec -- Fill new array with the number 1
+              (TConstant sInt64 1) 
+              (ArgArray Out arrayR (weakenVars (w' .> w) gvIn) (k' weakenId) :>:
+               ArgsNil
+              )
+            ) $
+           Exec -- (+1) Add new array to the result array of (*2)
+             TAdd 
+             (ArgArray In arrayR (weakenVars (w' .> w) gvIn) (weakenVars (w' .> w) gvbOut) :>: 
+              ArgArray In arrayR (weakenVars (w' .> w) gvIn) (k' weakenId) :>: 
+              weaken (w' .> w) argOut :>: 
+              ArgsNil
+             )
+
 mkExp :: forall env env' sh t. BufferEnv env env' -> PreOpenExp (ArrayInstr env) env' t -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
 mkExp _ (Const s e) aOut | OneOfDict <- tfAllDict s = Exec (TConstant s e) $ aOut :>: ArgsNil
 
@@ -229,6 +280,7 @@ mkExp env (Pair exp1 exp2) (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpair
    (mkExp env exp1 (ArgArray Out (ArrayR sh t1) gv gvb1))
    (mkExp env exp2 (ArgArray Out (ArrayR sh t2) gv gvb2))
 
+--
 mkExp env (ToIndex sh exp1 exp2) aOut
   | DeclareVars lhs w k <- declareVars $ shapeType sh
   , DeclareVars lhs' w' k' <- declareVars $ shapeType sh

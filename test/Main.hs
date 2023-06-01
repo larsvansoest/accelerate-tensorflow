@@ -19,6 +19,7 @@ import Data.Accelerate.TensorFlow.Kernel
 import Data.Array.Accelerate.Pretty.Schedule
 import Data.Array.Accelerate.AST.Schedule.Sequential hiding (Exp)
 import Data.Array.Accelerate.Pretty.Schedule.Sequential
+import Criterion.Main
 
 type Stencil5x1 a = (Stencil3 a, Stencil5 a, Stencil3 a)
 type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
@@ -51,6 +52,8 @@ tests = testGroup "tests"
   ]
 
 -- | Runs the given Accelerate computation on both interpreter and tensorflow backends and compares the results.
+-- TODO: performance metrics with https://hackage.haskell.org/package/criterion
+-- 
 assertAcc :: (Arrays t, Eq t, Show t) => Acc t -> Assertion
 assertAcc acc = run @TensorFlow acc @?= run @Interpreter acc
 
@@ -276,6 +279,10 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                               (compute $ map loop (use $ fromList (Z:.1) [10]))
                               (compute $ map loop (use $ fromList (Z:.1) [10]))
                           ]
+                        x = let
+                              vec    = use $ fromList (Z:.5) [0..] :: Acc (Vector Int)
+                              f      = (\x -> (x + 1) * 2) :: Exp Int -> Exp Int
+                            in map f vec :: Acc (Vector Int) 
 
         tElementWiseOperations :: TestTree
         tElementWiseOperations = testGroup "Element-wise operations"
