@@ -17,7 +17,7 @@ module Data.Accelerate.TensorFlow.Operation where
 import Data.Accelerate.TensorFlow.Type
     ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod )
 import Data.Array.Accelerate.AST.Operation
-    ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Var (..), Arg (ArgArray), PreArgs ((:>:), ArgsNil), Args )
+    ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Var (..) )
 import Data.Array.Accelerate
     ( MakesILP(..),
       ShrinkArg(..),
@@ -33,7 +33,6 @@ import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarCons
 import Data.Array.Accelerate.Representation.Shape (DIM1)
 import Data.Array.Accelerate.Type (ScalarType)
 import Data.Array.Accelerate.Analysis.Match ((:~:) (..))
-import Data.Array.Accelerate.Array.Buffer (Buffers, Buffer)
 import Data.Array.Accelerate.Representation.Type (TypeR, TupR (..), Distributes (reprIsSingle))
 import Prettyprinter ((<+>))
 import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
@@ -45,8 +44,7 @@ data TensorOp op where
   TId          :: OneOf TFAll a => TensorOp (In sh a -> Out sh a -> ())
   TSelect      :: OneOf TFAll a => TensorOp (In sh PrimBool -> In sh a -> In sh a -> Out sh a -> ())
   TGather      :: OneOf TFAll a => TensorOp (In DIM1 a -> In sh Int -> Out sh a -> ())
-  TWhere       :: TensorOp (In DIM1 Int -> Out DIM1 Int -> ())
-  TBooleanMask :: OneOf TFAll a => TensorOp (In DIM1 a -> In DIM1 PrimBool -> Out DIM1 a -> ())
+  TWhere       :: OneOf TFAll a => TensorOp (In DIM1 a -> Out DIM1 Int -> ())
   TCast :: (TensorType a, TensorType b) => TensorOp (In sh a -> Out sh b -> ())
 
   -- operators from Num
@@ -111,7 +109,7 @@ data TensorOp op where
   TLogicalOr  :: TensorOp (In sh PrimBool -> In sh PrimBool -> Out sh PrimBool -> ())
   TLogicalNot :: TensorOp (In sh PrimBool -> Out sh PrimBool -> ())
 
-  TTensorScatter :: ScatterFun -> TensorOp (Mut sh' s -> In sh sh' -> In sh s -> ())
+  TTensorScatter :: TensorType a => ScatterFun -> TensorOp (Mut DIM1 a -> In DIM1 Int -> In DIM1 a -> ())
 
 instance EncodeOperation TensorOp where
   encodeOperation :: TensorOp t -> Builder
@@ -130,7 +128,6 @@ instance EncodeOperation TensorOp where
     TTruncateDiv -> intHost $(hashQ ("TruncateDiv" :: String))
     TTruncateMod -> intHost $(hashQ ("TruncateMod" :: String))
     TTensorScatter sf -> encodeScatterFun sf
-    TBooleanMask -> intHost $(hashQ ("BooleanMask" :: String))
     TReciprocal -> intHost $(hashQ ("Reciprocal" :: String))
     TSin -> intHost $(hashQ ("Sin" :: String))
     TCos -> intHost $(hashQ ("Cos" :: String))
@@ -183,7 +180,6 @@ instance PrettyOp TensorOp where
     TSelect -> "TSelect"
     TGather -> "TGather"
     TWhere -> "TWhere"
-    TBooleanMask -> "TBooleanMask"
     TCast -> "TCast"
     TAdd -> "TAdd"
     TMul -> "TMul"

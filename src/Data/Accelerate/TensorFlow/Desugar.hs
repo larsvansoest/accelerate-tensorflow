@@ -26,9 +26,9 @@ import Data.Array.Accelerate.AST.Operation
       Out,
       In,
       Mut,
-      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe )
+      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe, Fun, ELeftHandSide )
 import Data.Array.Accelerate.AST.LeftHandSide
-    ( LeftHandSide(LeftHandSideWildcard, LeftHandSideSingle) )
+    ( LeftHandSide(..) )
 import Data.Array.Accelerate.Backend
     ( DesugarAcc(mkGenerate, mkPermute, mkMap) )
 import Data.Array.Accelerate.Type
@@ -52,7 +52,7 @@ import Data.Array.Accelerate.AST.Idx ( Idx(ZeroIdx, SuccIdx) )
 import Data.Array.Accelerate.Trafo.Operation.Substitution
     ( weakenArrayInstr, aletUnique, Sink(..) )
 import Data.Array.Accelerate.AST.Environment
-    ( mapEnv, prj', (.>), weakenId, push', type (:>), Env(Empty) )
+    ( mapEnv, prj', (.>), weakenId, push', type (:>), Env(Empty), weakenWithLHS )
 import Data.Array.Accelerate.Representation.Ground ( buffersR )
 import Data.Array.Accelerate.Trafo.Desugar ( desugarAlloc )
 import Data.Array.Accelerate.Trafo.Exp.Substitution
@@ -72,13 +72,15 @@ import Data.Accelerate.TensorFlow.Type
       tfNum'Dict,
       tfNumDict,
       tfOrdDict,
-      OneOfDict(OneOfDict), zero )
+      OneOfDict(OneOfDict), zero, tfTensorTypeDict' )
 import Data.Accelerate.TensorFlow.Operation
     ( TensorOp(..),
       ScatterFun(ScatterFunMin, ScatterFunAdd) )
 import Data.Array.Accelerate.Interpreter (evalMinBound, evalPi, evalMaxBound)
 import Data.Array.Accelerate.Representation.Slice
     ( SliceIndex(..), sliceDomainR, sliceEltR, sliceShapeR )
+import Data.Array.Accelerate.AST.Partitioned (TupRmonoid)
+import TensorFlow.GenOps.Core (_Arg)
 
 newtype BufferIdx benv a = BIdx (Idx benv (Buffer a))
 
@@ -138,11 +140,14 @@ instance DesugarAcc TensorOp where
     (ArgArray _ (ArrayR sh' _) gv' gvb')
     perm
     (ArgArray _ (ArrayR sh t) gv gvb)
-    | maybeSh'                     <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
-    , DeclareVars lhs w k          <- declareVars $ buffersR maybeSh'
-    , DeclareVars lhs' w' k'       <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
-    , DeclareVars lhs'' w'' k''    <- declareVars $ buffersR (shapeType sh')
-    , DeclareVars lhs''' w''' k''' <- declareVars $ buffersR t
+    | TensorTypeDict                  <- tfTensorTypeDict' t
+    , maybeSh'                        <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
+    , DeclareVars lhs w k             <- declareVars $ buffersR maybeSh'
+    , DeclareVars lhs' w' k'          <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+    , DeclareVars lhs'' w'' k''       <- declareVars $ buffersR (shapeType sh')
+    , DeclareVars lhs''' w''' k'''    <- declareVars $ buffersR t
+    , DeclareVars lhs'''' w'''' k'''' <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+    , DeclareVars lhsSh' wSh' kSh'    <- declareVars $ shapeType sh'
     = -- 1) Create an array of maybeSh' with perm
       aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
@@ -166,13 +171,20 @@ instance DesugarAcc TensorOp where
       (booleanMask t
         (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (TupRpair TupRunit (k' (w''' .> w''))) (isJust (TupRpair TupRunit (shapeType sh')) (k (w''' .> w'' .> w'))))
         (weakenVars (w''' .> w'' .> w' .> w) gvb)
-        (k''' weakenId)
+        (k''' weakenId) 
+      ) $
+      aletUnique lhs'''' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds (weakenVars (w''' .> w'' .> w' .> w) gv))) $
+      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      (mkMap
+        (ArgFun $ Lam lhsSh' $ Body (toIndex sh' (fromGrounds (weakenVars undefined gv')) (kSh' weakenId))) -- TODO: ask ivo about weakening gv' here.
+        (ArgArray In (ArrayR dim1 (shapeType sh')) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'' (w'''' .> w''')))
+        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId))
       ) $
       -- 4) Apply tf.tensor_scatter
       Exec (TTensorScatter scatterFun) (
-        ArgArray Mut (ArrayR sh' t) (weakenVars (w''' .> w'' .> w' .> w) gv') (weakenVars (w''' .> w'' .> w' .> w) gvb') :>:
-        ArgArray In (ArrayR sh (shapeType sh')) (weakenVars (w''' .> w'' .> w' .> w) gv) (k'' w''') :>:
-        ArgArray In (ArrayR sh t) (weakenVars (w''' .> w'' .> w' .> w) gv) (k''' weakenId) :>:
+        ArgArray Mut (ArrayR dim1 t) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (weakenVars (w'''' .> w''' .> w'' .> w' .> w) gvb') :>:
+        ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId) :>:
+        ArgArray In (ArrayR dim1 t) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k''' w'''') :>:
         ArgsNil
       )
         where
@@ -190,7 +202,6 @@ instance DesugarAcc TensorOp where
               PrimSub _ -> ScatterFunMin
               _         -> error "primfun not yet supported"
             _ -> error "complex combination for permute not supported"
-
 add :: forall env sh. 
        Arg env (In sh Int64) 
     -> Arg env (In sh Int64) 
@@ -198,7 +209,6 @@ add :: forall env sh.
     -> OperationAcc TensorOp env ()
 add argIn1 argIn2 argOut =
   Exec TAdd (argIn1 :>: argIn2 :>: argOut :>: ArgsNil)
-    
 
 mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) 
   -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
@@ -584,14 +594,26 @@ mkPrimFun2 _ _ _ _ _ = error "impossible"
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb
-booleanMask t@(TupRsingle s) (ArgArray _ _ gv gvbIn2) gvbIn1 gvbOut
+booleanMask t@(TupRsingle s) (ArgArray _ (ArrayR sh tIn1) gv gvbIn1) gvbIn2 gvbOut -- somehow boolean mask is missing in TF bindings
+  -- instead, use where + gather
   | OneOfDict <- tfAllDict s
-  = Exec
-      TBooleanMask
-      (ArgArray In (ArrayR dim1 t) gv gvbIn1 :>:
-       ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) gv gvbIn2 :>:
-       ArgArray Out (ArrayR dim1 t) gv gvbOut :>:
+  , DeclareVars lhs w k <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+  = aletUnique lhs (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds gv)) $
+    Alet (LeftHandSideWildcard TupRunit) TupRunit
+    (Exec
+      TWhere
+      (ArgArray In (ArrayR dim1 tIn1) (weakenVars w gv) (weakenVars w gvbIn1) :>:
+       ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (weakenVars w gv) (k weakenId) :>:
        ArgsNil)
+    )
+    (Exec
+      TGather
+      (ArgArray In (ArrayR dim1 t) (weakenVars w gv) (weakenVars w gvbIn2) :>:
+       ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (weakenVars w gv) (k weakenId) :>:
+       ArgArray Out (ArrayR dim1 t) (weakenVars w gv) (weakenVars w gvbOut) :>:
+       ArgsNil)
+    )
+
 booleanMask (TupRpair t1 t2) aOut (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) = Alet (LeftHandSideWildcard TupRunit) TupRunit
  (booleanMask t1 aOut gvbIn1 gvbOut1)
  (booleanMask t2 aOut gvbIn2 gvbOut2)

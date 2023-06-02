@@ -60,7 +60,6 @@ executables:
       - -with-rtsopts=-n2M
       - -with-rtsopts=-A64M
     dependencies:
-      - criterion
       - gloss
       - megaparsec
       - mwc-random
@@ -96,7 +95,6 @@ tests:
       - tasty-hedgehog
       - tasty-hunit
       - tasty-quickcheck
-      - criterion
     when:
       - condition: flag(llvm-cpu)
         cpp-options: -DACCELERATE_LLVM_NATIVE_BACKEND
@@ -106,5 +104,28 @@ tests:
         cpp-options: -DACCELERATE_LLVM_PTX_BACKEND
         dependencies:
           - accelerate-llvm-ptx
+
+benchmarks:
+  template-accelerate-bench:
+    main:                Main.hs
+    source-dirs:         bench
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-n2M
+      - -with-rtsopts=-A64M
+    dependencies:
+      - criterion
+      - template-accelerate
+    # when:
+    #   - condition: flag(llvm-cpu)
+    #     cpp-options: -DACCELERATE_LLVM_NATIVE_BACKEND
+    #     dependencies:
+    #       - accelerate-llvm-native
+    #   - condition: flag(llvm-ptx)
+    #     cpp-options: -DACCELERATE_LLVM_PTX_BACKEND
+    #     dependencies:
+    #       - accelerate-llvm-ptx
 
 # vim: nospell

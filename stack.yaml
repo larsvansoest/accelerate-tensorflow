@@ -29,7 +29,9 @@ extra-deps:
 - tasty-1.4.3
 - tasty-hunit-0.10.0.3
 - tasty-quickcheck-0.10.2
-- criterion
+- criterion-1.6.2.0
+- criterion-measurement-0.2.1.0
+- optparse-applicative-0.18.1.0
 
 # Override default flag values for local packages and extra-deps
 flags:

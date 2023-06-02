@@ -17,6 +17,7 @@ import Data.Array.Accelerate.Type
       IntegralType(..),
       NumType(..),
       SingleType(..), ScalarType(..) )
+import Data.Array.Accelerate.Representation.Type (TypeR, TupR (..))
 
 
 type family Type64 a where
@@ -178,6 +179,10 @@ tfIntDict TypeWord8  = OneOfDict
 tfIntDict TypeWord16 = OneOfDict
 tfIntDict TypeWord32 = OneOfDict
 tfIntDict TypeWord64 = OneOfDict
+
+tfTensorTypeDict' :: TypeR a -> TensorTypeDict a
+tfTensorTypeDict' (TupRsingle s) = tfTensorTypeDict s
+tfTensorTypeDict' _ = error "not a tf tensortype"
 
 tfTensorTypeDict :: ScalarType a -> TensorTypeDict a
 tfTensorTypeDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = TensorTypeDict

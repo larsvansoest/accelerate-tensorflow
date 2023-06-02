@@ -294,7 +294,6 @@ executeKernel env (TensorId aIn aOut)                 = executeUnaryKernel env a
 executeKernel env (TensorSelect aIn1 aIn2 aIn3 aOut)  = executeTernaryKernel env aIn1 aIn2 aIn3 aOut $ \x y z -> TF.select (TF.cast x) y z
 executeKernel env (TensorWhere aIn aOut)              = executeUnaryKernel env aIn aOut (\x -> TF.reshape (TF.where' x) (TF.vector [-1 :: Int64]))
 executeKernel env (TensorGather aIn1 aIn2 aOut)       = executeBinaryKernel env aIn1 aIn2 aOut TF.gather
-executeKernel env TensorBooleanMask {}                = undefined -- TODO: find replacement for TF.booleanMask
 executeKernel env (TensorCast aIn aOut)               = executeUnaryKernel env aIn aOut TF.cast
  
 executeKernel env (TensorAdd aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.add

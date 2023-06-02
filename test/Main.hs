@@ -19,7 +19,6 @@ import Data.Accelerate.TensorFlow.Kernel
 import Data.Array.Accelerate.Pretty.Schedule
 import Data.Array.Accelerate.AST.Schedule.Sequential hiding (Exp)
 import Data.Array.Accelerate.Pretty.Schedule.Sequential
-import Criterion.Main
 
 type Stencil5x1 a = (Stencil3 a, Stencil5 a, Stencil3 a)
 type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
@@ -32,8 +31,29 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 --            y = map (Data.Array.Accelerate.fromIndex (shape x)) x
 --        in putStrLn $ show $ run @TensorFlow y
 
+tPermute :: TestTree
+tPermute = let
+                                    histogram :: Acc (Vector Int) -> Acc (Vector Int)
+                                    histogram xs =
+                                      let zeros = fill (constant (Z:.10)) 0
+                                          ones  = fill (shape xs)         1
+                                      in
+                                      permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
+                                    identity :: Num a => Exp Int -> Acc (Matrix a)
+                                    identity n =
+                                      let zeros = fill (I2 n n) 0
+                                          ones  = fill (I1 n)   1
+                                      in
+                                      permute const zeros (\(I1 i) -> Just_ (I2 i i)) ones
+                                  in testGroup "permute"
+                                  [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int)),
+                                    testCase "identity" $ assertAcc (identity 5 :: Acc (Matrix Int64))
+                                  ]
 main :: IO ()
-main = defaultMain tests
+main = defaultMain tPermute
+
+-- main :: IO ()
+-- main = defaultMain tests
 
 -- main :: IO ()
 -- main = do 

@@ -56,10 +56,12 @@ data TensorKernel env where
   TensorVar         :: TensorType a => TensorArg env sh a -> BaseVar env a -> TensorKernel env
   TensorId          :: OneOf TFAll a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorSelect      :: OneOf TFAll a => TensorArg env sh PrimBool -> TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
-  TensorWhere       :: TensorArg env DIM1 Int -> TensorArg env DIM1 Int -> TensorKernel env
+  TensorWhere       :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorKernel env
   TensorGather      :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env sh Int -> TensorArg env sh a -> TensorKernel env
-  TensorBooleanMask :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env DIM1 PrimBool -> TensorArg env DIM1 a -> TensorKernel env
   TensorCast :: (TensorType a, TensorType b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+
+  -- scatter operations
+  -- TensorScatterAdd     :: OneOf TFAll a => TensorArg env sh' a -> 
 
   -- operators from Num
   TensorAdd  :: OneOf TFNum  a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
@@ -160,7 +162,6 @@ compileOperation TId (aIn :>: aOut :>: _)                                   = Te
 compileOperation TSelect (aIn1 :>: aIn2 :>: aIn3 :>: aOut :>: _)            = TensorSelect (arg aIn1) (arg aIn2) (arg aIn3) (arg aOut)
 compileOperation TWhere (aIn :>: aOut :>: _)                                = TensorWhere (arg aIn) (arg aOut)
 compileOperation TGather (aIn1 :>: aIn2 :>: aOut :>: _)                     = TensorGather (arg aIn1) (arg aIn2) (arg aOut)
-compileOperation TBooleanMask (aIn1 :>: aIn2 :>: aOut :>: _)                = TensorBooleanMask (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TCast (aIn :>: aOut :>: _)                                 = TensorCast (arg aIn) (arg aOut)
 compileOperation (TTensorScatter _) _                                       = undefined
 

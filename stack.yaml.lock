@@ -88,6 +88,27 @@ packages:
       size: 332
   original:
     hackage: tasty-quickcheck-0.10.2
+- completed:
+    hackage: criterion-1.6.2.0@sha256:256081026738835780a97314180972788d00847a7f4224cdab5612e8360b96a0,5373
+    pantry-tree:
+      sha256: 7534bbd0a3184c1b1ca50703bf93885e2e72b626aa6886657871e245bee785c0
+      size: 2323
+  original:
+    hackage: criterion-1.6.2.0
+- completed:
+    hackage: criterion-measurement-0.2.1.0@sha256:646d5b5c55499580747746396b731ef9d6e2cd59fa7b488354788e68eae8e9bc,2098
+    pantry-tree:
+      sha256: 2557db6ed7b4e5718d9ca6271caf4bcfc97b966ed32b051f346c8d17e1c31809
+      size: 726
+  original:
+    hackage: criterion-measurement-0.2.1.0
+- completed:
+    hackage: optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
+    pantry-tree:
+      sha256: 32f52adc150eb146bf4d167ff0cb21fc1e3cd7ecc1b9e5e83b986a1cd1bc58cd
+      size: 3124
+  original:
+    hackage: optparse-applicative-0.18.1.0
 snapshots:
 - completed:
     sha256: ce4fb8d44f3c6c6032060a02e0ebb1bd29937c9a70101c1517b92a87d9515160
