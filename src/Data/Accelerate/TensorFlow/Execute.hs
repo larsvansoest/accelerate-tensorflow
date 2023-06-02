@@ -295,7 +295,9 @@ executeKernel env (TensorSelect aIn1 aIn2 aIn3 aOut)  = executeTernaryKernel env
 executeKernel env (TensorWhere aIn aOut)              = executeUnaryKernel env aIn aOut (\x -> TF.reshape (TF.where' x) (TF.vector [-1 :: Int64]))
 executeKernel env (TensorGather aIn1 aIn2 aOut)       = executeBinaryKernel env aIn1 aIn2 aOut TF.gather
 executeKernel env (TensorCast aIn aOut)               = executeUnaryKernel env aIn aOut TF.cast
- 
+
+executeKernel env (TensorScatterAdd aMut aIn1 aIn2)   = executeTernaryKernel env aMut aIn1 aIn2 aMut TF.tensorScatterAdd
+
 executeKernel env (TensorAdd aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.add
 executeKernel env (TensorMul aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.mul
 executeKernel env (TensorSub aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.sub

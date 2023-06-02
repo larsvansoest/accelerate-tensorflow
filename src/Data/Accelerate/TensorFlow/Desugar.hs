@@ -148,6 +148,7 @@ instance DesugarAcc TensorOp where
     , DeclareVars lhs''' w''' k'''    <- declareVars $ buffersR t
     , DeclareVars lhs'''' w'''' k'''' <- declareVars $ buffersR (TupRsingle scalarTypeInt)
     , DeclareVars lhsSh' wSh' kSh'    <- declareVars $ shapeType sh'
+    , DeclareVars lhsSh'' wSh'' kSh''    <- declareVars $ shapeType sh'
     = -- 1) Create an array of maybeSh' with perm
       aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
@@ -176,7 +177,7 @@ instance DesugarAcc TensorOp where
       aletUnique lhs'''' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds (weakenVars (w''' .> w'' .> w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (mkMap
-        (ArgFun $ Lam lhsSh' $ Body (toIndex sh' (fromGrounds (weakenVars undefined gv')) (kSh' weakenId))) -- TODO: ask ivo about weakening gv' here.
+        (ArgFun $ Lam lhsSh' $ Body (Let lhsSh'' (paramsIn' $ fromGrounds (weakenVars (w'''' .> w''' .> w'' .> w' .> w) gv')) $ toIndex sh' (kSh'' weakenId) (kSh' wSh'')))
         (ArgArray In (ArrayR dim1 (shapeType sh')) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'' (w'''' .> w''')))
         (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId))
       ) $

@@ -33,7 +33,7 @@ import Data.Array.Accelerate.Backend
     ( IsKernel(KernelMetadata, compileKernel, KernelOperation),
       PrettyKernel(..),
       PrettyKernelStyle(PrettyKernelBody) )
-import Data.Accelerate.TensorFlow.Operation ( TensorOp(..) )
+import Data.Accelerate.TensorFlow.Operation ( TensorOp(..), ScatterFun (..) )
 import Data.Array.Accelerate.AST.Kernel ( NoKernelMetadata )
 import Data.Array.Accelerate.AST.Environment ( Env )
 import Data.Array.Accelerate.Eval
@@ -61,7 +61,7 @@ data TensorKernel env where
   TensorCast :: (TensorType a, TensorType b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
 
   -- scatter operations
-  -- TensorScatterAdd     :: OneOf TFAll a => TensorArg env sh' a -> 
+  TensorScatterAdd  :: TensorType a => TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorArg env DIM1 a -> TensorKernel env
 
   -- operators from Num
   TensorAdd  :: OneOf TFNum  a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
@@ -163,7 +163,7 @@ compileOperation TSelect (aIn1 :>: aIn2 :>: aIn3 :>: aOut :>: _)            = Te
 compileOperation TWhere (aIn :>: aOut :>: _)                                = TensorWhere (arg aIn) (arg aOut)
 compileOperation TGather (aIn1 :>: aIn2 :>: aOut :>: _)                     = TensorGather (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TCast (aIn :>: aOut :>: _)                                 = TensorCast (arg aIn) (arg aOut)
-compileOperation (TTensorScatter _) _                                       = undefined
+compileOperation (TTensorScatter ScatterFunAdd) (aMut :>: aIn1 :>: aIn2 :>: _) = TensorScatterAdd (arg aMut) (arg aIn1) (arg aIn2)
 
 compileOperation TAdd (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorAdd (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TMul (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorMul (arg aIn1) (arg aIn2) (arg aOut)
