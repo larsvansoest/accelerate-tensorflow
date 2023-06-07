@@ -216,13 +216,13 @@ instance DesugarAcc TensorOp where
 
           scatterFun :: ScatterFun = case comb of
             Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (PrimApp fun (Pair (Evar (Var _ (SuccIdx ZeroIdx))) (Evar (Var _ ZeroIdx)))))) -> case fun of
-              PrimAdd _ -> ScatterFunAdd
-              PrimSub _ -> ScatterFunSub
-              PrimMin _ -> ScatterFunMin
-              PrimMax _ -> ScatterFunMax
-              _         -> error "only add, sub, min, max allowed as combination function for permute not supported"
-            Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (Evar (Var _ (SuccIdx ZeroIdx))))) -> ScatterFunUpdate
-            _ -> error "only add, sub, min, max allowed as combination function for permute not supported"
+              PrimAdd _ -> ScatterFunAdd -- (+)
+              PrimSub _ -> ScatterFunSub -- (-)
+              PrimMin _ -> ScatterFunMin -- min
+              PrimMax _ -> ScatterFunMax -- max
+              _         -> error "only add, sub, min, max, const allowed as combination function for permute not supported"
+            Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (Evar (Var _ (SuccIdx ZeroIdx))))) -> ScatterFunUpdate -- const
+            _ -> error "only add, sub, min, max, const allowed as combination function for permute not supported"
             
 add :: forall env sh. 
        Arg env (In sh Int64) 
