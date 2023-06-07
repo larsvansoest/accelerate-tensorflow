@@ -293,12 +293,12 @@ executeKernel _ (TensorVar _ _)                       = error "impossible"
 
 executeKernel env (TensorId aIn aOut)                 = executeUnaryKernel env aIn aOut id
 executeKernel env (TensorSelect aIn1 aIn2 aIn3 aOut)  = executeTernaryKernel env aIn1 aIn2 aIn3 aOut $ \x y z -> TF.select (TF.cast x) y z
-executeKernel env (TensorWhere aIn aOut)              = debugExecuteUnaryKernel env aIn aOut (\x -> TF.reshape (TF.where' x) (TF.vector [-1 :: Int64])) "where"
-executeKernel env (TensorGather aIn1 aIn2 aOut)       = debugExecuteBinaryKernel env aIn1 aIn2 aOut TF.gather "gather"
+executeKernel env (TensorWhere aIn aOut)              = executeUnaryKernel env aIn aOut (\x -> TF.reshape (TF.where' x) (TF.vector [-1 :: Int64]))
+executeKernel env (TensorGather aIn1 aIn2 aOut)       = executeBinaryKernel env aIn1 aIn2 aOut TF.gather
 executeKernel env (TensorCast aIn aOut)               = executeUnaryKernel env aIn aOut TF.cast
 
 executeKernel env (TensorScatterAdd scatterFun aMut aIn1 aIn2) 
-  = debugExecuteTernaryKernel env aMut aIn1 aIn2 aMut (\x y z -> tfScatterFun x (TF.reshape y (TF.concat (TF.scalar 0) [TF.shape y, TF.vector [1 :: Int32]])) z) "tensorScatter"
+  = executeTernaryKernel env aMut aIn1 aIn2 aMut (\x y z -> tfScatterFun x (TF.reshape y (TF.concat (TF.scalar 0) [TF.shape y, TF.vector [1 :: Int32]])) z)
     where tfScatterFun = case scatterFun of
             ScatterFunAdd -> TF.tensorScatterAdd
             ScatterFunMin -> TF.tensorScatterMin
