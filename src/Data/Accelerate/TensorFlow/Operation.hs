@@ -127,7 +127,7 @@ instance EncodeOperation TensorOp where
     TSign -> intHost $(hashQ ("Sign" :: String))
     TTruncateDiv -> intHost $(hashQ ("TruncateDiv" :: String))
     TTruncateMod -> intHost $(hashQ ("TruncateMod" :: String))
-    TTensorScatter sf -> encodeScatterFun sf
+    TTensorScatter sf -> intHost $(hashQ ("TensorScatter" :: String)) <> encodeScatterFun sf
     TReciprocal -> intHost $(hashQ ("Reciprocal" :: String))
     TSin -> intHost $(hashQ ("Sin" :: String))
     TCos -> intHost $(hashQ ("Cos" :: String))
@@ -273,6 +273,9 @@ instance MakesILP TensorOp where
 data ScatterFun where
   ScatterFunAdd :: ScatterFun
   ScatterFunMin :: ScatterFun
+  ScatterFunMax :: ScatterFun
+  ScatterFunSub :: ScatterFun
+  ScatterFunUpdate :: ScatterFun
   deriving Show
 
 encodeScatterFun :: ScatterFun -> Builder

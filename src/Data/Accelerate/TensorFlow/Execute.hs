@@ -39,7 +39,7 @@ import Data.Array.Accelerate.Representation.Type
 import Data.Accelerate.TensorFlow.Type
     ( VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict, toType64, toType64', fromType64' )
 import Data.IORef ( IORef, newIORef, readIORef, writeIORef )
-import Data.Array.Accelerate.Type ( ScalarType, Int64 )
+import Data.Array.Accelerate.Type ( ScalarType, Int64, scalarTypeInt32, Int32 )
 import Data.Array.Accelerate.Array.Buffer
     ( Buffer,
       MutableBuffer,
@@ -69,13 +69,14 @@ import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Data.Array.Accelerate.Interpreter
     ( evalExpM, toBool, EvalArrayInstr(EvalArrayInstr) )
 import Data.Array.Accelerate.Pretty.Schedule ( PrettySchedule )
-import Data.Accelerate.TensorFlow.Operation ( TensorOp )
+import Data.Accelerate.TensorFlow.Operation ( TensorOp, ScatterFun (..) )
 import Unsafe.Coerce (unsafeCoerce)
 import Data.Array.Accelerate.AST.Operation (GroundVars, PrimBool, Vars)
 import Prelude hiding (exp)
 import Data.Data
 import Data.Array.Accelerate.Pretty.Operation (prettyBuffer)
 import qualified Data.Array.Accelerate.Pretty as Pretty
+import Data.Array.Accelerate.Representation.Elt (showElt)
 
 -- detect copy implementeren voor het versimpelen voor programma's
 data TensorFlow where
@@ -289,14 +290,21 @@ executeKernel _ (TensorConstant _ _)                  = error "impossible"
 executeKernel env (TensorVar arg (Var _ idx))
   | Scalar _ s <- prj' idx env                        = executeKernel env (TensorConstant arg s)
 executeKernel _ (TensorVar _ _)                       = error "impossible"
- 
+
 executeKernel env (TensorId aIn aOut)                 = executeUnaryKernel env aIn aOut id
 executeKernel env (TensorSelect aIn1 aIn2 aIn3 aOut)  = executeTernaryKernel env aIn1 aIn2 aIn3 aOut $ \x y z -> TF.select (TF.cast x) y z
-executeKernel env (TensorWhere aIn aOut)              = executeUnaryKernel env aIn aOut (\x -> TF.reshape (TF.where' x) (TF.vector [-1 :: Int64]))
-executeKernel env (TensorGather aIn1 aIn2 aOut)       = executeBinaryKernel env aIn1 aIn2 aOut TF.gather
+executeKernel env (TensorWhere aIn aOut)              = debugExecuteUnaryKernel env aIn aOut (\x -> TF.reshape (TF.where' x) (TF.vector [-1 :: Int64])) "where"
+executeKernel env (TensorGather aIn1 aIn2 aOut)       = debugExecuteBinaryKernel env aIn1 aIn2 aOut TF.gather "gather"
 executeKernel env (TensorCast aIn aOut)               = executeUnaryKernel env aIn aOut TF.cast
 
-executeKernel env (TensorScatterAdd aMut aIn1 aIn2)   = executeTernaryKernel env aMut aIn1 aIn2 aMut TF.tensorScatterAdd
+executeKernel env (TensorScatterAdd scatterFun aMut aIn1 aIn2) 
+  = debugExecuteTernaryKernel env aMut aIn1 aIn2 aMut (\x y z -> tfScatterFun x (TF.reshape y (TF.concat (TF.scalar 0) [TF.shape y, TF.vector [1 :: Int32]])) z) "tensorScatter"
+    where tfScatterFun = case scatterFun of
+            ScatterFunAdd -> TF.tensorScatterAdd
+            ScatterFunMin -> TF.tensorScatterMin
+            ScatterFunMax -> TF.tensorScatterMax
+            ScatterFunSub -> TF.tensorScatterSub
+            ScatterFunUpdate -> TF.tensorScatterUpdate
 
 executeKernel env (TensorAdd aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.add
 executeKernel env (TensorMul aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.mul
@@ -304,16 +312,16 @@ executeKernel env (TensorSub aIn1 aIn2 aOut)          = executeBinaryKernel env 
 executeKernel env (TensorNeg aIn aOut)                = executeUnaryKernel env aIn aOut TF.neg
 executeKernel env (TensorAbs aIn aOut)                = executeUnaryKernel env aIn aOut TF.abs
 executeKernel env (TensorSign aIn aOut)               = executeUnaryKernel env aIn aOut TF.sign
- 
+
 executeKernel env (TensorTruncateDiv aIn1 aIn2 aOut)  = executeBinaryKernel env aIn1 aIn2 aOut TF.truncateDiv
 executeKernel env (TensorTruncateMod aIn1 aIn2 aOut)  = executeBinaryKernel env aIn1 aIn2 aOut TF.truncateMod
 executeKernel env (TensorRealDiv aIn1 aIn2 aOut)      = executeBinaryKernel env aIn1 aIn2 aOut TF.realDiv
- 
+
 executeKernel env (TensorBitwiseAnd aIn1 aIn2 aOut)   = executeBinaryKernel env aIn1 aIn2 aOut TF.bitwiseAnd
 executeKernel env (TensorBitwiseOr aIn1 aIn2 aOut)    = executeBinaryKernel env aIn1 aIn2 aOut TF.bitwiseOr
 executeKernel env (TensorBitwiseXor aIn1 aIn2 aOut)   = executeBinaryKernel env aIn1 aIn2 aOut TF.bitwiseXor
 executeKernel env (TensorInvert aIn aOut)             = executeUnaryKernel env aIn aOut TF.invert
- 
+
 executeKernel env (TensorReciprocal aIn aOut)         = executeUnaryKernel env aIn aOut TF.reciprocal
 executeKernel env (TensorSin aIn aOut)                = executeUnaryKernel env aIn aOut TF.sin
 executeKernel env (TensorCos aIn aOut)                = executeUnaryKernel env aIn aOut TF.cos
@@ -472,11 +480,18 @@ debugTensorElement t@(Tensor st ref) = do
   liftIO $ runTensorElement t
   Vector (TF.Shape sh) _ <- liftIO $ readIORef ref
   x <- liftIO $ toBuffer st ref
-  liftIO $ putStrLn $ show sh
+  liftIO $ print sh
   liftIO $ putStrLn $ Pretty.renderForTerminal $ prettyBuffer st (fromIntegral $ product sh) x
   build <- buildTensor st (TF.Shape sh) ref
   liftIO $ writeIORef ref $ Build (TF.Shape sh) build
 
+debugTensorRef :: VectorType a => ScalarType a -> IORef (TensorValue a) -> TF.Session ()
+debugTensorRef st ref = do
+  liftIO $ runTensorRef ref
+  Vector (TF.Shape sh) vec <- liftIO $ readIORef ref
+  liftIO $ print sh
+  let s = S.foldl (\a b -> a ++ " " ++ showElt (TupRsingle st) b) "" vec
+  liftIO $ print s
 
 executeTernaryKernel :: TensorEnv env -> TensorArg env sh a -> TensorArg env sh' b -> TensorArg env sh'' c -> TensorArg env sh''' d -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b) -> TF.Tensor TF.Build (Type64 c) -> TF.Tensor TF.Build (Type64 d)) -> TF.Session (TensorElements ())
 executeTernaryKernel env (TensorArg inShR1 inShVars1 _ (Var _ inIdx1)) (TensorArg inShR2 inShVars2 _ (Var _ inIdx2)) (TensorArg inShR3 inShVars3 _ (Var _ inIdx3)) (TensorArg outShR outShVars _ (Var _ outIdx)) tfOp

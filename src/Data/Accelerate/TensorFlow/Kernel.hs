@@ -45,7 +45,7 @@ import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(LeftHandSidePair, LeftHandSideWildcard) )
 import Data.Array.Accelerate.Representation.Array
     ( ArrayR(ArrayR) )
-import Data.Array.Accelerate.Type ( ScalarType )
+import Data.Array.Accelerate.Type ( ScalarType, Int64 )
 import Data.Array.Accelerate.Representation.Shape (ShapeR, DIM1)
 
 data TensorArg env sh a where
@@ -61,7 +61,7 @@ data TensorKernel env where
   TensorCast :: (TensorType a, TensorType b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
 
   -- scatter operations
-  TensorScatterAdd  :: TensorType a => TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorArg env DIM1 a -> TensorKernel env
+  TensorScatterAdd :: TensorType a => ScatterFun -> TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorArg env DIM1 a -> TensorKernel env
 
   -- operators from Num
   TensorAdd  :: OneOf TFNum  a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
@@ -163,7 +163,7 @@ compileOperation TSelect (aIn1 :>: aIn2 :>: aIn3 :>: aOut :>: _)            = Te
 compileOperation TWhere (aIn :>: aOut :>: _)                                = TensorWhere (arg aIn) (arg aOut)
 compileOperation TGather (aIn1 :>: aIn2 :>: aOut :>: _)                     = TensorGather (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TCast (aIn :>: aOut :>: _)                                 = TensorCast (arg aIn) (arg aOut)
-compileOperation (TTensorScatter ScatterFunAdd) (aMut :>: aIn1 :>: aIn2 :>: _) = TensorScatterAdd (arg aMut) (arg aIn1) (arg aIn2)
+compileOperation (TTensorScatter scatterFun) (aMut :>: aIn1 :>: aIn2 :>: _) = TensorScatterAdd scatterFun (arg aMut) (arg aIn1) (arg aIn2)
 
 compileOperation TAdd (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorAdd (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TMul (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorMul (arg aIn1) (arg aIn2) (arg aOut)

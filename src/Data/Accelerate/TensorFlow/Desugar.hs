@@ -72,10 +72,10 @@ import Data.Accelerate.TensorFlow.Type
       tfNum'Dict,
       tfNumDict,
       tfOrdDict,
-      OneOfDict(OneOfDict), zero, tfTensorTypeDict' )
+      OneOfDict(OneOfDict), zero, tfTensorTypeDict', tfAllDict' )
 import Data.Accelerate.TensorFlow.Operation
     ( TensorOp(..),
-      ScatterFun(ScatterFunMin, ScatterFunAdd) )
+      ScatterFun(..) )
 import Data.Array.Accelerate.Interpreter (evalMinBound, evalPi, evalMaxBound)
 import Data.Array.Accelerate.Representation.Slice
     ( SliceIndex(..), sliceDomainR, sliceEltR, sliceShapeR )
@@ -104,34 +104,50 @@ instance DesugarAcc TensorOp where
     , DeclareVars lhs''' w''' k''' <- declareVars $ buffersR $ shapeType sh
     = aletUnique lhs (Compute (ShapeSize sh (paramsIn' $ fromGrounds gv))) $
       -- 1) Create a Tensor of flattened shape sh with only ones
-      aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeInt)) (fromGrounds (TupRpair TupRunit (k weakenId)))) $
+      aletUnique lhs' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeInt)) 
+        (fromGrounds (TupRpair TupRunit (k weakenId)))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
         (TConstant scalarTypeInt 1)
-        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k w')) (k' weakenId) :>: ArgsNil)
+        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) 
+          (TupRpair TupRunit (k w')) (k' weakenId) :>: ArgsNil)
       ) $
       -- 2) Obtain a tensor of indices (tf.where returns list of indices pointing to values > 0)
-      aletUnique lhs'' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeInt)) (fromGrounds (TupRpair TupRunit (k w')))) $
+      aletUnique lhs'' (desugarAlloc (ArrayR dim1 (TupRsingle scalarTypeInt)) 
+        (fromGrounds (TupRpair TupRunit (k w')))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (Exec
         TWhere
-        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k (w'' .> w'))) (k' w'') :>:
-         ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k (w'' .> w'))) (k'' weakenId) :>:
+        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) 
+          (TupRpair TupRunit (k (w'' .> w'))) (k' w'') :>:
+         ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) 
+          (TupRpair TupRunit (k (w'' .> w'))) (k'' weakenId) :>:
          ArgsNil)
       ) $
       -- 3) Convert 1d indices to multidimensional indices
-      aletUnique lhs''' (desugarAlloc (ArrayR dim1 (shapeType sh)) (fromGrounds $ TupRpair TupRunit (k (w'' .> w')))) $
+      aletUnique lhs''' (desugarAlloc 
+        (ArrayR dim1 (shapeType sh)) 
+        (fromGrounds $ TupRpair TupRunit (k (w'' .> w')))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (mkMap
-        (ArgFun $ Lam (LeftHandSideSingle scalarTypeInt) $ Body (FromIndex sh (paramsIn' $ fromGrounds $ weakenVars (w''' .> w'' .> w' .> w) gv) (Evar (Var scalarTypeInt ZeroIdx))))
-        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k'' w'''))
-        (ArgArray Out (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k''' weakenId))
+        (ArgFun $ Lam (LeftHandSideSingle scalarTypeInt) $ 
+          Body (FromIndex sh 
+            (paramsIn' $ fromGrounds $ weakenVars (w''' .> w'' .> w' .> w) gv) 
+            (Evar (Var scalarTypeInt ZeroIdx))))
+        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) 
+          (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k'' w'''))
+        (ArgArray Out (ArrayR dim1 (shapeType sh)) 
+          (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k''' weakenId))
       )
       -- 4) Apply f to the indices
       (mkMap
         (weaken (w''' .> w'' .> w' .> w) f)
-        (ArgArray In (ArrayR dim1 (shapeType sh)) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k''' weakenId))
-        (ArgArray Out (ArrayR dim1 t) (TupRpair TupRunit (k (w''' .> w'' .> w'))) (weakenVars (w''' .> w'' .> w' .> w) gvb))
+        (ArgArray In (ArrayR dim1 (shapeType sh)) 
+          (TupRpair TupRunit (k (w''' .> w'' .> w'))) (k''' weakenId))
+        (ArgArray Out 
+          (ArrayR dim1 t) 
+          (TupRpair TupRunit (k (w''' .> w'' .> w'))) 
+          (weakenVars (w''' .> w'' .> w' .> w) gvb))
       )
 
   mkPermute :: Arg env (Fun' (e -> e -> e)) -> Arg env (Mut sh' e) -> Arg env (Fun' (sh -> PrimMaybe sh')) -> Arg env (In sh e) -> OperationAcc TensorOp env ()
@@ -141,6 +157,7 @@ instance DesugarAcc TensorOp where
     perm
     (ArgArray _ (ArrayR sh t) gv gvb)
     | TensorTypeDict                  <- tfTensorTypeDict' t
+    , OneOfDict                       <- tfAllDict' t
     , maybeSh'                        <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
     , DeclareVars lhs w k             <- declareVars $ buffersR maybeSh'
     , DeclareVars lhs' w' k'          <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
@@ -148,7 +165,7 @@ instance DesugarAcc TensorOp where
     , DeclareVars lhs''' w''' k'''    <- declareVars $ buffersR t
     , DeclareVars lhs'''' w'''' k'''' <- declareVars $ buffersR (TupRsingle scalarTypeInt)
     , DeclareVars lhsSh' wSh' kSh'    <- declareVars $ shapeType sh'
-    , DeclareVars lhsSh'' wSh'' kSh''    <- declareVars $ shapeType sh'
+    , DeclareVars lhsSh'' wSh'' kSh'' <- declareVars $ shapeType sh'
     = -- 1) Create an array of maybeSh' with perm
       aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
@@ -166,7 +183,7 @@ instance DesugarAcc TensorOp where
         (fromJust (shapeType sh') (k (w'' .> w')))
         (k'' weakenId)
       ) $
-      -- 3) Get 1D array of source indices (sh) with perm output (Just sh'), by applying a boolean mask with predicate isJust.
+      -- 3) Get 1D array of source values with perm output (Just sh'), by applying a boolean mask with predicate isJust.
       aletUnique lhs''' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w'' .> w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (booleanMask t
@@ -197,12 +214,16 @@ instance DesugarAcc TensorOp where
           fromJust _ (TupRpair _ (TupRpair _ a)) = a
           fromJust _ _ = error "impossible"
 
-          scatterFun = case comb of
+          scatterFun :: ScatterFun = case comb of
             Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (PrimApp fun (Pair (Evar (Var _ (SuccIdx ZeroIdx))) (Evar (Var _ ZeroIdx)))))) -> case fun of
               PrimAdd _ -> ScatterFunAdd
-              PrimSub _ -> ScatterFunMin
-              _         -> error "primfun not yet supported"
-            _ -> error "complex combination for permute not supported"
+              PrimSub _ -> ScatterFunSub
+              PrimMin _ -> ScatterFunMin
+              PrimMax _ -> ScatterFunMax
+              _         -> error "only add, sub, min, max allowed as combination function for permute not supported"
+            Lam (LeftHandSideSingle _) (Lam (LeftHandSideSingle _) (Body (Evar (Var _ (SuccIdx ZeroIdx))))) -> ScatterFunUpdate
+            _ -> error "only add, sub, min, max allowed as combination function for permute not supported"
+            
 add :: forall env sh. 
        Arg env (In sh Int64) 
     -> Arg env (In sh Int64) 

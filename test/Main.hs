@@ -31,26 +31,28 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 --            y = map (Data.Array.Accelerate.fromIndex (shape x)) x
 --        in putStrLn $ show $ run @TensorFlow y
 
+histogram :: Acc (Vector Int) -> Acc (Vector Int)
+histogram xs =
+  let zeros = fill (shape xs) 0
+      ones  = fill (shape xs)         1
+  in
+  permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
+const2d' :: Num a => Exp Int -> Acc (Matrix a)
+const2d' n =
+  let zeros = fill (I2 n n) 0
+      ones  = fill (I2 n n)   1
+  in
+  permute const zeros (\(I2 i j) -> Just_ (I2 i j)) ones
+
 tPermute :: TestTree
-tPermute = let
-                                    histogram :: Acc (Vector Int) -> Acc (Vector Int)
-                                    histogram xs =
-                                      let zeros = fill (constant (Z:.10)) 0
-                                          ones  = fill (shape xs)         1
-                                      in
-                                      permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
-                                    identity :: Num a => Exp Int -> Acc (Matrix a)
-                                    identity n =
-                                      let zeros = fill (I2 n n) 0
-                                          ones  = fill (I1 n)   1
-                                      in
-                                      permute const zeros (\(I1 i) -> Just_ (I2 i i)) ones
-                                  in testGroup "permute"
-                                  [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int)),
-                                    testCase "identity" $ assertAcc (identity 5 :: Acc (Matrix Int64))
-                                  ]
+tPermute = testGroup "permute"
+            [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int)),
+              testCase "const2d" $ assertAcc (const2d' 5 :: Acc (Matrix Int64))
+            ]
+
 main :: IO ()
-main = defaultMain tPermute
+main = do putStrLn $ test @UniformScheduleFun @TensorKernel $ histogram
+          defaultMain tPermute
 
 -- main :: IO ()
 -- main = defaultMain tests
@@ -191,7 +193,8 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                   ]
                   where tGenerate = testGroup "Generate"
                           [ testCase "generate 1.2s" $ assertAcc (generate (I1 3) (const 1.2) :: Acc (Array DIM1 Float)),
-                            testCase "generate [1..]" $ assertAcc (generate (I1 10) (\(I1 i) -> fromIntegral $ i + 1) :: Acc (Array DIM1 Int64))
+                            testCase "generate [1..]" $ assertAcc (generate (I1 10) (\(I1 i) -> fromIntegral $ i + 1) :: Acc (Array DIM1 Int64)),
+                            testCase "generate even" $ assertAcc (generate (I1 5) (\(I1 i) -> fromIntegral $ i `mod` 2) :: Acc (Array DIM1 Int64))
                           ]
                         tFill = testGroup "Fill"
                           [ testCase "fill 1.2s" $ assertAcc (fill (constant (Z :. 3)) 1.2 :: Acc (Array DIM1 Float))

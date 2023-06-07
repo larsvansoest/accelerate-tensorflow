@@ -216,6 +216,10 @@ tfVectorTypeDict (SingleScalarType (NumSingleType (FloatingNumType TypeFloat))) 
 tfVectorTypeDict (SingleScalarType (NumSingleType (FloatingNumType TypeDouble))) = VectorTypeDict
 tfVectorTypeDict (VectorScalarType _) = error "not a TF vector type"
 
+tfAllDict' :: TypeR a -> OneOfDict TFAll a
+tfAllDict' (TupRsingle s) = tfAllDict s
+tfAllDict' _ = error "not a tf tensortype"
+
 tfAllDict :: ScalarType a -> OneOfDict TFAll a
 tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = OneOfDict
 tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt8)))   = OneOfDict
