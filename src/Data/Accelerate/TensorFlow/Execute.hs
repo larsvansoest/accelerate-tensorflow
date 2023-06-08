@@ -175,8 +175,8 @@ executeSeqSchedule env (Acond (Var _ condIdx) exp1 exp2)
       then executeSeqSchedule env exp1
       else executeSeqSchedule env exp2
 
--- executeSeqSchedule env (Awhile _ cond exp vars) = executeAwhile env cond exp (mapTupR (\(Var _ idx) -> prj' idx env) vars)
-executeSeqSchedule _ (Awhile _ _ _ _) = error "execution of Awhile disabled"
+executeSeqSchedule env (Awhile _ cond exp vars) = executeAwhile env cond exp (mapTupR (\(Var _ idx) -> prj' idx env) vars)
+-- executeSeqSchedule _ (Awhile _ _ _ _) = error "execution of Awhile disabled"
 
 -- TODO: ask Ivo about this.
 executeAwhile :: TensorEnv env -> SeqScheduleFun TensorKernel env (t -> PrimBool) -> SeqScheduleFun TensorKernel env (t -> t) -> TensorElements t -> TF.Session (TensorElements t)
@@ -189,8 +189,8 @@ executeAwhile env cond@(Slam condLhs (Sbody condSched)) body@(Slam expLhs (Sbody
   condValue <- liftIO $ returnTensorElement condElement
   if toBool condValue
     then do -- 3.1) If true, perform while body
-            ts' <- executeSeqSchedule (push env (expLhs, ts)) expSched
-            executeAwhile env cond body ts'
+            _ <- executeSeqSchedule (push env (expLhs, ts)) expSched
+            executeAwhile env cond body ts
     else return ts -- 3.2) If false, return tensor values.
 executeAwhile _ _ _ _ = error "impossible"
 
