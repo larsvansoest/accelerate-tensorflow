@@ -19,7 +19,6 @@ import Data.Array.Accelerate.Type
       SingleType(..), ScalarType(..) )
 import Data.Array.Accelerate.Representation.Type (TypeR, TupR (..))
 
-
 type family Type64 a where
   Type64 Int   = Int64
   Type64 Word  = Word64
@@ -218,7 +217,7 @@ tfVectorTypeDict (VectorScalarType _) = error "not a TF vector type"
 
 tfAllDict' :: TypeR a -> OneOfDict TFAll a
 tfAllDict' (TupRsingle s) = tfAllDict s
-tfAllDict' _ = error "not a tf tensortype"
+tfAllDict' _ = error "not a tf all type"
 
 tfAllDict :: ScalarType a -> OneOfDict TFAll a
 tfAllDict (SingleScalarType (NumSingleType (IntegralNumType TypeInt)))    = OneOfDict
