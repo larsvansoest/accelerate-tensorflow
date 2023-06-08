@@ -4,3 +4,4 @@ template-accelerate.cabal
 gurobi.log
 extra-deps/tf*
 test-logs/
+/dist-newstyle/
