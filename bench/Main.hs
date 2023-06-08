@@ -9,19 +9,15 @@ import Data.Accelerate.TensorFlow.Kernel
 import Data.Array.Accelerate.Pretty.Schedule
 import Data.Array.Accelerate.AST.Schedule.Sequential hiding (Exp)
 import Data.Array.Accelerate.Pretty.Schedule.Sequential
+import Prelude hiding (fromIntegral)
 
--- The function we're benchmarking.
-histogram :: Acc (Vector Int) -> Acc (Vector Int)
-histogram xs =
-  let zeros = fill (constant (Z:.10)) 0
-      ones  = fill (shape xs)         1
-  in
-  permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
+generateEven :: Acc (Array DIM1 Int64)
+generateEven = generate (I1 5) (\(I1 i) -> fromIntegral $ i `mod` 2)
 
 -- Our benchmark harness.
 main :: IO ()
 main = defaultMain [
-  bgroup "fib" [ bench "TF histogram"  $ whnf (run @TensorFlow) $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int))
-               , bench "Interpreter histogram"  $ whnf (run @Interpreter) $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int))
+  bgroup "fib" [ bench "TF generateEven"  $ whnf (run @TensorFlow) generateEven
+               , bench "Interpreter generateEven"  $ whnf (run @Interpreter) generateEven
                ]
   ]

@@ -26,7 +26,7 @@ import Data.Array.Accelerate.AST.Operation
       Out,
       In,
       Mut,
-      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe, Fun, ELeftHandSide )
+      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe )
 import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(..) )
 import Data.Array.Accelerate.Backend
@@ -40,7 +40,7 @@ import Data.Array.Accelerate.Type
       SingleType(NumSingleType),
       ScalarType(SingleScalarType), BoundedType (..), Int64 )
 import Data.Array.Accelerate.Representation.Array
-    ( Buffer, Buffers, ArrayR(ArrayR), Array )
+    ( Buffer, Buffers, ArrayR(ArrayR) )
 import Data.Array.Accelerate.Representation.Type
     ( Distributes(reprIsSingle),
       Distribute,
@@ -52,7 +52,7 @@ import Data.Array.Accelerate.AST.Idx ( Idx(ZeroIdx, SuccIdx) )
 import Data.Array.Accelerate.Trafo.Operation.Substitution
     ( weakenArrayInstr, aletUnique, Sink(..) )
 import Data.Array.Accelerate.AST.Environment
-    ( mapEnv, prj', (.>), weakenId, push', type (:>), Env(Empty), weakenWithLHS )
+    ( mapEnv, prj', (.>), weakenId, push', type (:>), Env(Empty) )
 import Data.Array.Accelerate.Representation.Ground ( buffersR )
 import Data.Array.Accelerate.Trafo.Desugar ( desugarAlloc )
 import Data.Array.Accelerate.Trafo.Exp.Substitution
@@ -79,8 +79,6 @@ import Data.Accelerate.TensorFlow.Operation
 import Data.Array.Accelerate.Interpreter (evalMinBound, evalPi, evalMaxBound)
 import Data.Array.Accelerate.Representation.Slice
     ( SliceIndex(..), sliceDomainR, sliceEltR, sliceShapeR )
-import Data.Array.Accelerate.AST.Partitioned (TupRmonoid)
-import TensorFlow.GenOps.Core (_Arg)
 
 newtype BufferIdx benv a = BIdx (Idx benv (Buffer a))
 
@@ -164,7 +162,7 @@ instance DesugarAcc TensorOp where
     , DeclareVars lhs'' w'' k''       <- declareVars $ buffersR (shapeType sh')
     , DeclareVars lhs''' w''' k'''    <- declareVars $ buffersR t
     , DeclareVars lhs'''' w'''' k'''' <- declareVars $ buffersR (TupRsingle scalarTypeInt)
-    , DeclareVars lhsSh' wSh' kSh'    <- declareVars $ shapeType sh'
+    , DeclareVars lhsSh' _ kSh'       <- declareVars $ shapeType sh'
     , DeclareVars lhsSh'' wSh'' kSh'' <- declareVars $ shapeType sh'
     = -- 1) Create an array of maybeSh' with perm
       aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
@@ -173,9 +171,9 @@ instance DesugarAcc TensorOp where
         (weaken w perm)
         (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))
       ) $
-      -- 2) To apply boolean mask with 1D arrays, we need to flatten. Calculate the dim1 size.
+      -- 2) To apply boolean mask (filter) with 1D arrays, we need to flatten. Calculate the dim1 size.
       aletUnique lhs' (Compute (ShapeSize sh (paramsIn' $ weakenVars w $ fromGrounds gv))) $
-      -- 3) Get 1D array of (Just sh'), by applying a boolean mask with predicate isJust.
+      -- 3) Get 1D array of indices (sh'), by filtering with predicate isJust and map with fromJust.
       aletUnique lhs'' (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds (weakenVars (w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (booleanMask (shapeType sh')
@@ -183,14 +181,15 @@ instance DesugarAcc TensorOp where
         (fromJust (shapeType sh') (k (w'' .> w')))
         (k'' weakenId)
       ) $
-      -- 3) Get 1D array of source values with perm output (Just sh'), by applying a boolean mask with predicate isJust.
+      -- 4) Get 1D array of updates by filtering with predicate isJust.
       aletUnique lhs''' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w'' .> w' .> w) gv))) $
-      Alet (LeftHandSideWildcard TupRunit) TupRunit
+      Alet (LeftHandSideWildcard TupRunit) TupRunit 
       (booleanMask t
         (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (TupRpair TupRunit (k' (w''' .> w''))) (isJust (TupRpair TupRunit (shapeType sh')) (k (w''' .> w'' .> w'))))
         (weakenVars (w''' .> w'' .> w' .> w) gvb)
         (k''' weakenId) 
       ) $
+      -- 5) Map array of indices (sh') with toIndex to obtain 1D array of flattened indices.
       aletUnique lhs'''' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds (weakenVars (w''' .> w'' .> w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
       (mkMap
@@ -198,7 +197,7 @@ instance DesugarAcc TensorOp where
         (ArgArray In (ArrayR dim1 (shapeType sh')) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'' (w'''' .> w''')))
         (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId))
       ) $
-      -- 4) Apply tf.tensor_scatter
+      -- 4) Apply tensor scatter to 1D array of source values, 1D array of flattened indices and 1D array of updates.
       Exec (TTensorScatter scatterFun) (
         ArgArray Mut (ArrayR dim1 t) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (weakenVars (w'''' .> w''' .> w'' .> w' .> w) gvb') :>:
         ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId) :>:
@@ -427,7 +426,7 @@ mkExp env (Foreign _ _ fallback exp) (ArgArray _ (ArrayR sh t) gv gvb)
 -- Not supported
 mkExp _ VecPack {} _   = error "VecPack operation not supported by TensorFlow backend."
 mkExp _ VecUnpack {} _ = error "VecUnpack operation not supported by TensorFlow backend."
-mkExp _ Case {} _      = error "Case operation not supported by TensorFlow backend."
+mkExp _ Case {} _      = error "Case operation not supported by TensorFlow backend." -- TODO: check with Ivo
 mkExp _ While {} _     = error "While operation not supported by TensorFlow backend."
 
 mkExp _ _ _ = error "impossible"

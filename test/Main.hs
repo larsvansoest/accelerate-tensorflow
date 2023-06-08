@@ -79,6 +79,9 @@ tests = testGroup "tests"
 assertAcc :: (Arrays t, Eq t, Show t) => Acc t -> Assertion
 assertAcc acc = run @TensorFlow acc @?= run @Interpreter acc
 
+assertAcc' :: (Arrays t, Eq t, Show t) => Acc t -> t -> Assertion
+assertAcc' acc t = run @TensorFlow acc @?= t
+
 assertAcc2 :: (Arrays a, Eq a, Show a, Arrays b, Eq b, Show b) => (Acc a, Acc b) -> Assertion
 assertAcc2 (a, b) = sequence_
   [ assertAcc a,
@@ -587,18 +590,18 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                                     const2d :: Num a => Exp Int -> Acc (Matrix a)
                                     const2d n =
                                       let zeros = fill (I2 n n) 0
-                                          ones  = fill (I2 n n)   1
+                                          ones  = fill (I2 n n) 1
                                       in
                                       permute const zeros (\(I2 i j) -> Just_ (I2 i j)) ones
                                   in testGroup "permute"
-                                  [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int)),
-                                    testCase "const2d" $ assertAcc (const2d 5 :: Acc (Matrix Int64))
+                                  [ testCase "histogram" $ assertAcc' (histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int))) (fromList (Z :. 20) [2,4,4,3,2,2,0,0,2,1,0,0,0,0,0,0,0,0,0,0] :: Vector Int),
+                                    testCase "const2d" $ assertAcc' (const2d 3 :: Acc (Matrix Int64)) (fromList (Z :. 3 :. 3) [1,1,1,1,1,1,1,1,1])
                                   ]
                                 tScatter = let
-                                    to    = fromList (Z :. 6) [1,3,7,2,5,8] :: Vector Int
+                                    to    = fromList (Z :. 6) [1,3,4,2,5,4] :: Vector Int
                                     input = fromList (Z :. 6) [1,9,6,4,4,2] :: Vector Int
                                   in testGroup "scatter"
-                                  [ testCase "scatter" $ assertAcc $ scatter (use to) (fill (constant (Z:.10)) 0) (use input)
+                                  [ testCase "scatter" $ assertAcc $ scatter (use to) (fill (constant (Z:.6)) 0) (use input)
                                   ]
                         tBackwardPermutation = testGroup "Backward Permutation (gather)"
                           [ tBackpermute,
@@ -616,7 +619,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                                   [ testCase "backpermute swap" $ assertAcc $ backpermute (swap (shape mat')) swap mat'
                                   ]
                                 tGather = let
-                                    from  = fromList (Z :. 6) [1,3,6,2,5,8] :: Vector Int
+                                    from  = fromList (Z :. 6) [1,3,6,2,5,4] :: Vector Int
                                     input = fromList (Z :. 7) [1,9,6,4,4,2,5] :: Vector Int
                                   in testGroup "gather"
                                   [ testCase "gather" $ assertAcc $ gather (use from) (use input)
