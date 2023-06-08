@@ -175,22 +175,24 @@ executeSeqSchedule env (Acond (Var _ condIdx) exp1 exp2)
       then executeSeqSchedule env exp1
       else executeSeqSchedule env exp2
 
-executeSeqSchedule _ (Awhile _ _ _ _) = error "execution of Awhile disabled" -- executeAwhile env cond exp vars
+-- executeSeqSchedule env (Awhile _ cond exp vars) = executeAwhile env cond exp (mapTupR (\(Var _ idx) -> prj' idx env) vars)
+executeSeqSchedule _ (Awhile _ _ _ _) = error "execution of Awhile disabled"
 
-executeAwhile :: TensorEnv env -> SeqScheduleFun TensorKernel env (t -> PrimBool) -> SeqScheduleFun TensorKernel env (t -> t) -> GroundVars env t -> TF.Session (TensorElements t)
-executeAwhile env cond body vars = let t = mapTupR (\(Var _ idx) -> prj' idx env) vars in executeAwhile' env cond body t
-
-executeAwhile' :: TensorEnv env -> SeqScheduleFun TensorKernel env (t -> PrimBool) -> SeqScheduleFun TensorKernel env (t -> t) -> TensorElements t -> TF.Session (TensorElements t)
-executeAwhile' env cond@(Slam condLhs (Sbody condSched)) body@(Slam expLhs (Sbody expSched)) t = do
-  liftIO $ runTensorElements t
-  TupRsingle condElement <- executeSeqSchedule (push env (condLhs, t)) condSched
+-- TODO: ask Ivo about this.
+executeAwhile :: TensorEnv env -> SeqScheduleFun TensorKernel env (t -> PrimBool) -> SeqScheduleFun TensorKernel env (t -> t) -> TensorElements t -> TF.Session (TensorElements t)
+executeAwhile env cond@(Slam condLhs (Sbody condSched)) body@(Slam expLhs (Sbody expSched)) ts = do
+  -- 1) Run all tensor elements.
+  liftIO $ runTensorElements ts
+  -- 2) Check condition
+  TupRsingle condElement <- executeSeqSchedule (push env (condLhs, ts)) condSched
   liftIO $ runTensorElement condElement
   condValue <- liftIO $ returnTensorElement condElement
   if toBool condValue
-   then do t' <- executeSeqSchedule (push env (expLhs, t)) expSched
-           executeAwhile' env cond body t'
-   else return t
-executeAwhile' _ _ _ _ = error "impossible"
+    then do -- 3.1) If true, perform while body
+            ts' <- executeSeqSchedule (push env (expLhs, ts)) expSched
+            executeAwhile env cond body ts'
+    else return ts -- 3.2) If false, return tensor values.
+executeAwhile _ _ _ _ = error "impossible"
 
 executeKernelFun :: TensorEnv env -> KernelFun TensorKernel args -> SArgs env args -> TF.Session (TensorElements ())
 executeKernelFun = executeOpenKernelFun Empty
