@@ -45,7 +45,7 @@ import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(LeftHandSidePair, LeftHandSideWildcard) )
 import Data.Array.Accelerate.Representation.Array
     ( ArrayR(ArrayR) )
-import Data.Array.Accelerate.Type ( ScalarType, Int64 )
+import Data.Array.Accelerate.Type ( ScalarType )
 import Data.Array.Accelerate.Representation.Shape (ShapeR, DIM1)
 
 data TensorArg env sh a where
@@ -58,7 +58,7 @@ data TensorKernel env where
   TensorSelect      :: OneOf TFAll a => TensorArg env sh PrimBool -> TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorWhere       :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorKernel env
   TensorGather      :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env sh Int -> TensorArg env sh a -> TensorKernel env
-  TensorCast :: (TensorType a, TensorType b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+  TensorCast        :: (TensorType a, TensorType b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
 
   -- scatter operations
   TensorScatterAdd :: TensorType a => ScatterFun -> TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorArg env DIM1 a -> TensorKernel env

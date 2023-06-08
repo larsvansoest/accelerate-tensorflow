@@ -31,31 +31,31 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 --            y = map (Data.Array.Accelerate.fromIndex (shape x)) x
 --        in putStrLn $ show $ run @TensorFlow y
 
--- histogram :: Acc (Vector Int) -> Acc (Vector Int)
--- histogram xs =
---   let zeros = fill (shape xs) 0
---       ones  = fill (shape xs)         1
---   in
---   permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
--- const2d' :: Num a => Exp Int -> Acc (Matrix a)
--- const2d' n =
---   let zeros = fill (I2 n n) 0
---       ones  = fill (I2 n n)   1
---   in
---   permute const zeros (\(I2 i j) -> Just_ (I2 i j)) ones
+histogram :: Acc (Vector Int) -> Acc (Vector Int)
+histogram xs =
+  let zeros = fill (shape xs) 0
+      ones  = fill (shape xs)         1
+  in
+  permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
+const2d' :: Num a => Exp Int -> Acc (Matrix a)
+const2d' n =
+  let zeros = fill (I2 n n) 0
+      ones  = fill (I2 n n)   1
+  in
+  permute const zeros (\(I2 i j) -> Just_ (I2 i j)) ones
 
--- tPermute :: TestTree
--- tPermute = testGroup "permute"
---             [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int)),
---               testCase "const2d" $ assertAcc (const2d' 5 :: Acc (Matrix Int64))
---             ]
-
--- main :: IO ()
--- main = do putStrLn $ test @UniformScheduleFun @TensorKernel $ histogram
---           defaultMain tPermute
+tPermute :: TestTree
+tPermute = testGroup "permute"
+            [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int)),
+              testCase "const2d" $ assertAcc (const2d' 5 :: Acc (Matrix Int64))
+            ]
 
 main :: IO ()
-main = defaultMain tests
+main = do putStrLn $ test @UniformScheduleFun @TensorKernel $ histogram
+          defaultMain tPermute
+
+-- main :: IO ()
+-- main = defaultMain tests
 
 -- main :: IO ()
 -- main = do 

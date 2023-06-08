@@ -39,7 +39,7 @@ import Data.Array.Accelerate.Representation.Type
 import Data.Accelerate.TensorFlow.Type
     ( VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict, toType64, toType64', fromType64' )
 import Data.IORef ( IORef, newIORef, readIORef, writeIORef )
-import Data.Array.Accelerate.Type ( ScalarType, Int64, scalarTypeInt32, Int32 )
+import Data.Array.Accelerate.Type ( ScalarType, Int64, Int32 )
 import Data.Array.Accelerate.Array.Buffer
     ( Buffer,
       MutableBuffer,
@@ -52,7 +52,7 @@ import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.AST.LeftHandSide
     ( LeftHandSide(..) )
 import Data.Array.Accelerate.AST.Environment
-    ( prj', Env(Push, Empty), update' )
+    ( prj', Env(Push, Empty) )
 import Control.Concurrent ( MVar, putMVar )
 import Data.Array.Accelerate.AST.Kernel
     ( OpenKernelFun(..),
@@ -102,7 +102,7 @@ runTensorElementsIOFun (GFunctionRbody gr) tef
 
 input :: GroundsR t' -> t' -> TupR TensorElement t'
 input (TupRsingle (GroundRscalar st)) s = TupRsingle $ Scalar (TupRsingle st) s
-input (TupRsingle (GroundRbuffer st)) s = undefined -- TupRsingle $ Scalar (TupRsingle st) s -- dit in IO zetten (FullIOFun)
+input (TupRsingle (GroundRbuffer _)) _ = undefined -- TupRsingle $ Scalar (TupRsingle st) s -- dit in IO zetten (FullIOFun)
 input (TupRpair _ _) _ = error "impossible"
 input TupRunit _ = TupRunit
 
@@ -300,10 +300,10 @@ executeKernel env (TensorCast aIn aOut)               = executeUnaryKernel env a
 executeKernel env (TensorScatterAdd scatterFun aMut aIn1 aIn2) 
   = executeTernaryKernel env aMut aIn1 aIn2 aMut (\x y z -> tfScatterFun x (TF.reshape y (TF.concat (TF.scalar 0) [TF.shape y, TF.vector [1 :: Int32]])) z)
     where tfScatterFun = case scatterFun of
-            ScatterFunAdd -> TF.tensorScatterAdd
-            ScatterFunMin -> TF.tensorScatterMin
-            ScatterFunMax -> TF.tensorScatterMax
-            ScatterFunSub -> TF.tensorScatterSub
+            ScatterFunAdd    -> TF.tensorScatterAdd
+            ScatterFunMin    -> TF.tensorScatterMin
+            ScatterFunMax    -> TF.tensorScatterMax
+            ScatterFunSub    -> TF.tensorScatterSub
             ScatterFunUpdate -> TF.tensorScatterUpdate
 
 executeKernel env (TensorAdd aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.add

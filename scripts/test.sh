@@ -11,4 +11,4 @@ export TF_CPP_MIN_LOG_LEVEL=2
 cd $PROJECT_DIR
 mkdir -p "test-logs"
 cur_date=$(date +%s)
-stack test > $SCRIPT_PATH/../test-logs/test-${cur_date}.log
+stack test &> $SCRIPT_PATH/../test-logs/test-${cur_date}.log

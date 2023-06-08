@@ -17,7 +17,7 @@ module Data.Accelerate.TensorFlow.Operation where
 import Data.Accelerate.TensorFlow.Type
     ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod )
 import Data.Array.Accelerate.AST.Operation
-    ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Var (..) )
+    ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Var (..), Arg (ArgArray), PreArgs ((:>:), ArgsNil), Args )
 import Data.Array.Accelerate
     ( MakesILP(..),
       ShrinkArg(..),
@@ -235,9 +235,9 @@ instance NFData' TensorOp where
   rnf' !_ = ()
 
 instance SimplifyOperation TensorOp where
-  -- detectCopy :: (forall t t'. GroundVars env t -> GroundVars env t' -> Maybe (t :~: t')) -> TensorOp op -> Args env op -> [CopyOperation env]
-  -- detectCopy _ TId (ArgArray _ (ArrayR _ t) _ gvbIn :>: ArgArray _ _ _ gvbOut :>: ArgsNil) = copyOperation t gvbIn gvbOut
-  -- detectCopy _ _ _ = []
+  detectCopy :: (forall t t'. GroundVars env t -> GroundVars env t' -> Maybe (t :~: t')) -> TensorOp op -> Args env op -> [CopyOperation env]
+  detectCopy _ TId (ArgArray _ (ArrayR _ t) _ gvbIn :>: ArgArray _ _ _ gvbOut :>: ArgsNil) = copyOperation t gvbIn gvbOut
+  detectCopy _ _ _ = []
 
 copyOperation :: TypeR e -> GroundVars env (Buffers e) -> GroundVars env (Buffers e) -> [CopyOperation env]
 copyOperation _ TupRunit _ = []
@@ -247,8 +247,6 @@ copyOperation (TupRsingle (st :: ScalarType e)) (TupRsingle (Var _ idx1)) (TupRs
 copyOperation (TupRpair t1 t2) (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) 
   = copyOperation t1 gvbIn1 gvbOut1 ++ copyOperation t2 gvbIn2 gvbOut2
 copyOperation _ _ _ = error "impossible"
-
--- vraag woensdag: dit werkt niet want ik krijg een clustering issue
 
 instance SLVOperation TensorOp where
   slvOperation _ = Nothing
@@ -271,17 +269,23 @@ instance MakesILP TensorOp where
   encodeBackendClusterArg NoFusionArg = intHost $(hashQ ("NoFusionArg" :: String))
 
 data ScatterFun where
-  ScatterFunAdd :: ScatterFun
-  ScatterFunMin :: ScatterFun
-  ScatterFunMax :: ScatterFun
-  ScatterFunSub :: ScatterFun
+  ScatterFunAdd    :: ScatterFun
+  ScatterFunMin    :: ScatterFun
+  ScatterFunMax    :: ScatterFun
+  ScatterFunSub    :: ScatterFun
   ScatterFunUpdate :: ScatterFun
   deriving Show
 
 encodeScatterFun :: ScatterFun -> Builder
-encodeScatterFun ScatterFunAdd = intHost $(hashQ ("ScatterFunAdd" :: String))
-encodeScatterFun ScatterFunMin = intHost $(hashQ ("ScatterFunMin" :: String))
+encodeScatterFun ScatterFunAdd    = intHost $(hashQ ("ScatterFunAdd" :: String))
+encodeScatterFun ScatterFunMin    = intHost $(hashQ ("ScatterFunMin" :: String))
+encodeScatterFun ScatterFunMax    = intHost $(hashQ ("ScatterFunMax" :: String))
+encodeScatterFun ScatterFunSub    = intHost $(hashQ ("ScatterFunSub" :: String))
+encodeScatterFun ScatterFunUpdate = intHost $(hashQ ("ScatterFunUpdate" :: String))
 
 prettyScatterFun :: ScatterFun -> Adoc
 prettyScatterFun ScatterFunAdd = "ScatterFunAdd"
 prettyScatterFun ScatterFunMin = "ScatterFunMin"
+prettyScatterFun ScatterFunMax = "ScatterFunMax"
+prettyScatterFun ScatterFunSub = "ScatterFunSub"
+prettyScatterFun ScatterFunUpdate = "ScatterFunUpdate"
