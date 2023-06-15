@@ -71,12 +71,13 @@ import Data.Array.Accelerate.Interpreter
 import Data.Array.Accelerate.Pretty.Schedule ( PrettySchedule )
 import Data.Accelerate.TensorFlow.Operation ( TensorOp, ScatterFun (..) )
 import Unsafe.Coerce (unsafeCoerce)
-import Data.Array.Accelerate.AST.Operation (GroundVars, PrimBool, Vars)
+import Data.Array.Accelerate.AST.Operation (PrimBool, Vars)
 import Prelude hiding (exp)
-import Data.Data
+import Data.Data ( type (:~:)(Refl) )
 import Data.Array.Accelerate.Pretty.Operation (prettyBuffer)
 import qualified Data.Array.Accelerate.Pretty as Pretty
 import Data.Array.Accelerate.Representation.Elt (showElt)
+import qualified Debug.Trace
 
 data TensorFlow where
   TensorFlow :: TensorFlow
@@ -138,7 +139,7 @@ executeSeqSchedule env (Return vars) = return $ mapTupR (\(Var _ idx) -> prj' id
 
 executeSeqSchedule env (Compute expr) = do
   value <- evalExpM expr $ EvalArrayInstr $ evalArrayInstr env
-  return $ TupRsingle (Scalar (expType expr) value)
+  return $ toTensorElements (expType expr) value
 
 executeSeqSchedule env (Alet lhs _ sched sched') = do
   rhs <- executeSeqSchedule env sched
@@ -171,7 +172,7 @@ executeSeqSchedule _ (Unit _) = error "impossible"
 
 executeSeqSchedule env (Acond (Var _ condIdx) exp1 exp2)
   | (Scalar _ cond) <- prj' condIdx env
-  = if toBool cond
+  = if toBool cond -- convert PrimBool to Bool
       then executeSeqSchedule env exp1
       else executeSeqSchedule env exp2
 
@@ -187,10 +188,10 @@ executeAwhile env cond@(Slam condLhs (Sbody condSched)) body@(Slam expLhs (Sbody
   TupRsingle condElement <- executeSeqSchedule (push env (condLhs, ts)) condSched
   liftIO $ runTensorElement condElement
   condValue <- liftIO $ returnTensorElement condElement
-  if toBool condValue
+  if Debug.Trace.trace (show condValue) $ toBool condValue
     then do -- 3.1) If true, perform while body
-            _ <- executeSeqSchedule (push env (expLhs, ts)) expSched
-            executeAwhile env cond body ts
+            ts' <- executeSeqSchedule (push env (expLhs, ts)) expSched
+            executeAwhile env cond body ts'
     else return ts -- 3.2) If false, return tensor values.
 executeAwhile _ _ _ _ = error "impossible"
 
@@ -207,7 +208,9 @@ executeKernel env (TensorConstant (TensorArg shR shVars st (Var _ idx)) s)
   | Tensor _ ref <- prj' idx env
   = do
   sh <- liftIO $ getShape env shR shVars
-  liftIO $ writeIORef ref $ Build (TF.Shape sh) $ TF.fill (TF.vector sh) (TF.scalar (toType64' st s))
+  liftIO $ writeIORef ref $ 
+    Build (TF.Shape sh) $ 
+      TF.fill (TF.vector sh) (TF.scalar (toType64' st s))
   return TupRunit
 executeKernel _ (TensorConstant _ _)                  = error "impossible"
 
@@ -221,7 +224,7 @@ executeKernel env (TensorWhere aIn aOut)              = executeUnaryKernel env a
 executeKernel env (TensorGather aIn1 aIn2 aOut)       = executeBinaryKernel env aIn1 aIn2 aOut TF.gather
 executeKernel env (TensorCast aIn aOut)               = executeUnaryKernel env aIn aOut TF.cast
 
-executeKernel env (TensorScatterAdd scatterFun aMut aIn1 aIn2) 
+executeKernel env (TensorScatter scatterFun aMut aIn1 aIn2) 
   = executeTernaryKernel env aMut aIn1 aIn2 aMut (\x y z -> tfScatterFun x (TF.reshape y (TF.concat (TF.scalar 0) [TF.shape y, TF.vector [1 :: Int32]])) z)
     where tfScatterFun = case scatterFun of
             ScatterFunAdd    -> TF.tensorScatterAdd
@@ -387,13 +390,12 @@ buildTensor _ (TF.Shape sh) ref = do
       return build
     Nil _ -> error "can not build TNil"
 
--- | convert all tensor values to vectors
-runTensorElements :: TensorElements t -> IO ()
-runTensorElements TupRunit         = return ()
-runTensorElements (TupRsingle v)   = runTensorElement v
-runTensorElements (TupRpair v1 v2) = do runTensorElements v1
-                                        runTensorElements v2
+toTensorElements :: TypeR t -> t -> TensorElements t
+toTensorElements TupRunit _ = TupRunit
+toTensorElements t@(TupRsingle _) value = TupRsingle (Scalar t value)
+toTensorElements (TupRpair t1 t2) (v1, v2) = TupRpair (toTensorElements t1 v1) (toTensorElements t2 v2)
 
+-- | convert all tensor values to vectors
 returnTensorElement :: TensorElement a -> IO a
 returnTensorElement (Scalar _ a) = return a
 returnTensorElement (Tensor st ref) = toBuffer st ref
@@ -405,6 +407,17 @@ returnTensorElements (TupRpair t t') = do elems  <- returnTensorElements t
                                           elems' <- returnTensorElements t'
                                           return (elems, elems')
 
+runTensorElements :: TensorElements t -> IO ()
+runTensorElements TupRunit         = return ()
+runTensorElements (TupRsingle v)   = runTensorElement v
+runTensorElements (TupRpair v1 v2) = do runTensorElements v1
+                                        runTensorElements v2
+
+-- | convert a tensorvalue to a vector
+runTensorElement :: TensorElement t -> IO ()
+runTensorElement (Scalar _ _) = return ()
+runTensorElement (Tensor _ ref) = runTensorRef ref
+
 runTensorRef :: VectorType a => IORef (TensorValue a) -> IO ()
 runTensorRef ref = do
   value <- readIORef ref
@@ -414,11 +427,6 @@ runTensorRef ref = do
       writeIORef ref $ Vector sh vec
     Vector _ _ -> return ()
     Nil _ -> error "can not run NIL ref"
-
--- | convert a tensorvalue to a vector
-runTensorElement :: TensorElement t -> IO ()
-runTensorElement (Scalar _ _) = return ()
-runTensorElement (Tensor _ ref) = runTensorRef ref
 
 -- Methods used for debugging intermediate TensorFlow output.
 debugExecuteUnaryKernel :: TensorEnv env -> TensorArg env sh a -> TensorArg env sh' b -> (TF.Tensor TF.Build (Type64 a) -> TF.Tensor TF.Build (Type64 b)) -> String -> TF.Session (TensorElements ())
@@ -504,8 +512,14 @@ debugExecuteTernaryKernel env (TensorArg inShR1 inShVars1 _ (Var _ inIdx1)) (Ten
     return TupRunit
 debugExecuteTernaryKernel _ _ _ _ _ _ _ = error "impossible"
 
+debugTensorElements :: TensorElements t -> TF.Session ()
+debugTensorElements TupRunit         = return ()
+debugTensorElements (TupRsingle v)   = debugTensorElement v
+debugTensorElements (TupRpair v1 v2) = do debugTensorElements v1
+                                          debugTensorElements v2
+
 debugTensorElement :: TensorElement t -> TF.Session ()
-debugTensorElement (Scalar _ _) = liftIO $ putStrLn "scalar"
+debugTensorElement (Scalar t a) = liftIO $ putStrLn $ showElt t a -- "scalar"
 debugTensorElement t@(Tensor st ref) = do
   liftIO $ runTensorElement t
   Vector (TF.Shape sh) _ <- liftIO $ readIORef ref

@@ -306,7 +306,7 @@ mkExp env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
       (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k' w''))
       (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId))
       (ArgArray Out (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb))
-    )
+    ) -- lazy evaluated tensors do not exist, and TSelect evaluates them already
 
 mkExp _ Nil _ = Return TupRunit
 

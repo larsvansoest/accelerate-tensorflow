@@ -34,9 +34,10 @@ import Data.Array.Accelerate.Representation.Shape (DIM1)
 import Data.Array.Accelerate.Type (ScalarType)
 import Data.Array.Accelerate.Analysis.Match ((:~:) (..))
 import Data.Array.Accelerate.Representation.Type (TypeR, TupR (..), Distributes (reprIsSingle))
-import Prettyprinter ((<+>))
+import Prettyprinter ((<+>), Pretty (pretty))
 import Data.Array.Accelerate.Pretty.Type (prettyScalarType)
 import Data.Array.Accelerate.Representation.Array
+import Data.Array.Accelerate.Representation.Elt (showElt)
 
 data TensorOp op where
   TConstant    :: OneOf TFAll a => ScalarType a -> a -> TensorOp (Out sh a -> ())
@@ -173,8 +174,8 @@ instance EncodeOperation TensorOp where
 
 instance PrettyOp TensorOp where
   prettyOp :: TensorOp t -> Adoc
-  prettyOp = \case 
-    TConstant st _ -> "TConstant" <+> prettyScalarType st
+  prettyOp = \case
+    TConstant st a -> "TConstant" <+> prettyScalarType st <+> pretty (showElt (TupRsingle st) a)
     TVar st -> "TVar" <+> prettyScalarType st
     TId -> "TId"
     TSelect -> "TSelect"
@@ -230,7 +231,7 @@ instance PrettyOp TensorOp where
     TCeil -> "TCeil"
     TIsNan -> "TIsNan"
     TIsInf -> "TIsInf"
-    
+
 instance NFData' TensorOp where
   rnf' !_ = ()
 
@@ -241,10 +242,10 @@ instance SimplifyOperation TensorOp where
 
 copyOperation :: TypeR e -> GroundVars env (Buffers e) -> GroundVars env (Buffers e) -> [CopyOperation env]
 copyOperation _ TupRunit _ = []
-copyOperation (TupRsingle (st :: ScalarType e)) (TupRsingle (Var _ idx1)) (TupRsingle (Var _ idx2)) 
+copyOperation (TupRsingle (st :: ScalarType e)) (TupRsingle (Var _ idx1)) (TupRsingle (Var _ idx2))
   | Refl <- reprIsSingle @ScalarType @e @Buffer st
   = [CopyOperation idx1 idx2]
-copyOperation (TupRpair t1 t2) (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2) 
+copyOperation (TupRpair t1 t2) (TupRpair gvbIn1 gvbIn2) (TupRpair gvbOut1 gvbOut2)
   = copyOperation t1 gvbIn1 gvbOut1 ++ copyOperation t2 gvbIn2 gvbOut2
 copyOperation _ _ _ = error "impossible"
 

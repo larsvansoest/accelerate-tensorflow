@@ -54,8 +54,49 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 -- main = do putStrLn $ test @UniformScheduleFun @TensorKernel $ histogram
 --           defaultMain tPermute
 
+-- awhileAcc :: Acc (Array DIM1 Int64)
+-- awhileAcc = --awhile (\x -> unit $ x ! I1 0 <= 10) (map (+ 1)) (use $ fromList (Z:.10) [0..] :: Acc (Array DIM1 Int64)) :: Acc (Array DIM1 Int64)
+--   awhile (fold (&&) True_ . map (<= 10)) (map (+ 1)) (use $ fromList (Z:.10) [0..] :: Acc (Array DIM1 Int64)) :: Acc (Array DIM1 Int64)
+-- tAWhile :: TestTree
+-- tAWhile = testGroup "awhile"
+--   [ testCase "awhile" $ assertAcc awhileAcc
+--   ]
+
+-- acondAcc :: Acc (Array DIM2 Int64)
+-- acondAcc = acond True_ (use $ fromList (Z:.5:.10) [0..]) (use $ fromList (Z:.5:.10) [5..])
+
+-- tAcond :: TestTree
+-- tAcond = testGroup "acond"
+--   [ testCase "acond" $ assertAcc acondAcc
+--   ]
+
+-- foldAcc :: Acc (Scalar Int)
+-- foldAcc = fold (+) 42 (use (fromList (Z:.3) [0..] :: Vector Int))
+
+-- tFold :: TestTree
+-- tFold = testGroup "fold"
+--   [ testCase "fold + 42" $ assertAcc foldAcc
+--   ]
+
+-- main :: IO ()
+-- main = do putStrLn $ test @SequentialSchedule @TensorKernel $ foldAcc
+--           defaultMain tFold
+
+replicateAcc :: Acc (Array ((Z :. Int) :. Int) Int)
+replicateAcc = replicate (constant (Z :. (4 :: Int) :. All)) (use (fromList (Z:.3) [0..] :: Vector Int))
+
+tRep :: TestTree
+tRep = testGroup "rep"
+  [ testCase "rep" $ assertAcc replicateAcc
+  ]
+
 main :: IO ()
-main = defaultMain tests
+main = do putStrLn $ test @SequentialSchedule @TensorKernel $ replicateAcc
+          defaultMain tRep
+
+
+-- main :: IO ()
+-- main = defaultMain tests
 
 -- main :: IO ()
 -- main = do 
@@ -308,7 +349,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                         x = let
                               vec    = use $ fromList (Z:.5) [0..] :: Acc (Vector Int)
                               f      = (\x -> (x + 1) * 2) :: Exp Int -> Exp Int
-                            in map f vec :: Acc (Vector Int) 
+                            in map f vec :: Acc (Vector Int)
 
         tElementWiseOperations :: TestTree
         tElementWiseOperations = testGroup "Element-wise operations"
