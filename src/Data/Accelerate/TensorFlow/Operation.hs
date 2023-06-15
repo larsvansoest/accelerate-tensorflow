@@ -65,6 +65,8 @@ data TensorOp op where
   TBitwiseAnd :: OneOf TFInt a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
   TBitwiseOr  :: OneOf TFInt a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
   TBitwiseXor :: OneOf TFInt a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
+  TRightShift :: OneOf TFInt a => TensorOp (In sh a -> In sh Int -> Out sh a -> ())
+  TLeftShift  :: OneOf TFInt a => TensorOp (In sh a -> In sh Int -> Out sh a -> ())
   TInvert     :: OneOf TFInt a => TensorOp (In sh a -> Out sh a -> ())
 
   -- operators from Fractional and Floating
@@ -163,6 +165,8 @@ instance EncodeOperation TensorOp where
     TBitwiseAnd -> intHost $(hashQ ("BitwiseAnd" :: String))
     TBitwiseOr -> intHost $(hashQ ("BitwiseOr" :: String))
     TBitwiseXor -> intHost $(hashQ ("BitwiseXor" :: String))
+    TRightShift -> intHost $(hashQ ("RightShift" :: String))
+    TLeftShift -> intHost $(hashQ ("LeftShift" :: String))
     TInvert -> intHost $(hashQ ("Invert" :: String))
     TCast -> intHost $(hashQ ("Cast" :: String))
     TGather -> intHost $(hashQ ("Gather" :: String))
@@ -194,6 +198,8 @@ instance PrettyOp TensorOp where
     TBitwiseAnd -> "TBitwiseAnd"
     TBitwiseOr -> "TBitwiseOr"
     TBitwiseXor -> "TBitwiseXor"
+    TRightShift -> "TRightShift"
+    TLeftShift -> "TLeftShift"
     TInvert -> "TInvert"
     TReciprocal -> "TReciprocal"
     TSin -> "TSin"

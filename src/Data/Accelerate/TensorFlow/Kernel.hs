@@ -80,6 +80,8 @@ data TensorKernel env where
   TensorBitwiseAnd :: OneOf TFInt a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorBitwiseOr  :: OneOf TFInt a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorBitwiseXor :: OneOf TFInt a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
+  TensorRightShift :: OneOf TFInt a => TensorArg env sh a -> TensorArg env sh Int -> TensorArg env sh a -> TensorKernel env
+  TensorLeftShift  :: OneOf TFInt a => TensorArg env sh a -> TensorArg env sh Int -> TensorArg env sh a -> TensorKernel env
   TensorInvert     :: OneOf TFInt a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
 
   -- operators from Fractional and Floating
@@ -179,6 +181,8 @@ compileOperation TRealDiv (aIn1 :>: aIn2 :>: aOut :>: _)                    = Te
 compileOperation TBitwiseAnd (aIn1 :>: aIn2 :>: aOut :>: _)                 = TensorBitwiseAnd (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TBitwiseOr (aIn1 :>: aIn2 :>: aOut :>: _)                  = TensorBitwiseOr (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TBitwiseXor (aIn1 :>: aIn2 :>: aOut :>: _)                 = TensorBitwiseXor (arg aIn1) (arg aIn2) (arg aOut)
+compileOperation TRightShift (aIn1 :>: aIn2 :>: aOut :>: _)                 = TensorRightShift (arg aIn1) (arg aIn2) (arg aOut)
+compileOperation TLeftShift (aIn1 :>: aIn2 :>: aOut :>: _)                  = TensorLeftShift (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TInvert (aIn :>: aOut :>: _)                               = TensorInvert (arg aIn) (arg aOut)
 
 compileOperation TReciprocal (aIn :>: aOut :>: _)                           = TensorReciprocal (arg aIn) (arg aOut)

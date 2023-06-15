@@ -247,6 +247,8 @@ executeKernel env (TensorRealDiv aIn1 aIn2 aOut)      = executeBinaryKernel env 
 executeKernel env (TensorBitwiseAnd aIn1 aIn2 aOut)   = executeBinaryKernel env aIn1 aIn2 aOut TF.bitwiseAnd
 executeKernel env (TensorBitwiseOr aIn1 aIn2 aOut)    = executeBinaryKernel env aIn1 aIn2 aOut TF.bitwiseOr
 executeKernel env (TensorBitwiseXor aIn1 aIn2 aOut)   = executeBinaryKernel env aIn1 aIn2 aOut TF.bitwiseXor
+executeKernel env (TensorRightShift aIn1 aIn2 aOut)   = executeBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.rightShift x (TF.cast y))
+executeKernel env (TensorLeftShift aIn1 aIn2 aOut)    = executeBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.leftShift x (TF.cast y))
 executeKernel env (TensorInvert aIn aOut)             = executeUnaryKernel env aIn aOut TF.invert
 
 executeKernel env (TensorReciprocal aIn aOut)         = executeUnaryKernel env aIn aOut TF.reciprocal
@@ -391,8 +393,8 @@ buildTensor _ (TF.Shape sh) ref = do
     Nil _ -> error "can not build TNil"
 
 toTensorElements :: TypeR t -> t -> TensorElements t
-toTensorElements TupRunit _ = TupRunit
-toTensorElements t@(TupRsingle _) value = TupRsingle (Scalar t value)
+toTensorElements TupRunit _                = TupRunit
+toTensorElements t@(TupRsingle _) value    = TupRsingle (Scalar t value)
 toTensorElements (TupRpair t1 t2) (v1, v2) = TupRpair (toTensorElements t1 v1) (toTensorElements t2 v2)
 
 -- | convert all tensor values to vectors
