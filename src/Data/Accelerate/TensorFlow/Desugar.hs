@@ -157,16 +157,17 @@ instance DesugarAcc TensorOp where
     (ArgArray _ (ArrayR sh' _) gv' gvb')
     perm
     (ArgArray _ (ArrayR sh t) gv gvb)
-    | TensorTypeDict                  <- tfTensorTypeDict' t
-    , OneOfDict                       <- tfAllDict' t
-    , maybeSh'                        <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
-    , DeclareVars lhs w k             <- declareVars $ buffersR maybeSh'
-    , DeclareVars lhs' w' k'          <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
-    , DeclareVars lhs'' w'' k''       <- declareVars $ buffersR (shapeType sh')
-    , DeclareVars lhs''' w''' k'''    <- declareVars $ buffersR t
-    , DeclareVars lhs'''' w'''' k'''' <- declareVars $ buffersR (TupRsingle scalarTypeInt)
-    , DeclareVars lhsSh' _ kSh'       <- declareVars $ shapeType sh'
-    , DeclareVars lhsSh'' wSh'' kSh'' <- declareVars $ shapeType sh'
+    | TensorTypeDict                     <- tfTensorTypeDict' t
+    , OneOfDict                          <- tfAllDict' t
+    , maybeSh'                           <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
+    , DeclareVars lhs w k                <- declareVars $ buffersR maybeSh'
+    , DeclareVars lhs' w' k'             <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+    , DeclareVars lhs'' w'' k''          <- declareVars $ buffersR (shapeType sh')
+    , DeclareVars lhs''' w''' k'''       <- declareVars $ buffersR t
+    , DeclareVars lhs'''' w'''' k''''    <- declareVars $ buffersR (TupRsingle scalarTypeInt)
+    , DeclareVars lhs''''' w''''' k''''' <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
+    , DeclareVars lhsSh' _ kSh'          <- declareVars $ shapeType sh'
+    , DeclareVars lhsSh'' wSh'' kSh''    <- declareVars $ shapeType sh'
     = -- 1) Create an array of maybeSh' with perm
       aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
@@ -200,11 +201,13 @@ instance DesugarAcc TensorOp where
         (ArgArray In (ArrayR dim1 (shapeType sh')) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'' (w'''' .> w''')))
         (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId))
       ) $
-      -- 4) Apply tensor scatter to 1D array of source values, 1D array of flattened indices and 1D array of updates.
+      -- 4) Compute linearised index of input shape
+      aletUnique lhs''''' (Compute (ShapeSize sh' (paramsIn' $ weakenVars (w'''' .> w''' .> w'' .> w' .> w) $ fromGrounds gv'))) $
+      -- 5) Apply tensor scatter to 1D array of source values, 1D array of flattened indices and 1D array of updates.
       Exec (TTensorScatter scatterFun) (
-        ArgArray Mut (ArrayR dim1 t) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (weakenVars (w'''' .> w''' .> w'' .> w' .> w) gvb') :>:
-        ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId) :>:
-        ArgArray In (ArrayR dim1 t) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k''' w'''') :>:
+        ArgArray Mut (ArrayR dim1 t) (TupRpair TupRunit (k''''' weakenId)) (weakenVars (w''''' .> w'''' .> w''' .> w'' .> w' .> w) gvb') :>:
+        ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w''''' .> w'''' .> w''' .> w''))) (k'''' w''''') :>:
+        ArgArray In (ArrayR dim1 t) (TupRpair TupRunit (k' (w''''' .> w'''' .> w''' .> w''))) (k''' (w''''' .> w'''')) :>:
         ArgsNil
       )
         where
