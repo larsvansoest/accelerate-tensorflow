@@ -102,6 +102,7 @@ type TFNum    = TFAll TF.\\ '[Bool]
 type TFNum'   = TFNum TF.\\ '[Word8]
 type TFOrd    = TFNum TF.\\ '[Complex Double, Complex Float]
 type TFInt    = TFOrd TF.\\ '[Double, Float]
+type TFInt'   = TFInt TF.\\ '[Word8]
 type TFMod    = '[Int32, Int64, Word16, Double, Float]
 
 type TFFloat = '[Double, Float]

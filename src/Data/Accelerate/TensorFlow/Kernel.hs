@@ -10,7 +10,7 @@
 
 module Data.Accelerate.TensorFlow.Kernel where
 import Data.Accelerate.TensorFlow.Type
-    ( TFOrd, OneOf, TFNum, TFNum', TFAll, TFFloat, TensorType, TFInt, TFMod )
+    ( TFOrd, OneOf, TFNum, TFNum', TFAll, TFFloat, TensorType, TFInt, TFMod, TFInt' )
 import Data.Array.Accelerate.AST.Schedule.Uniform
     ( PrimBool,
       Var(Var),
@@ -46,7 +46,7 @@ import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.Representation.Array
     ( ArrayR(ArrayR) )
 import Data.Array.Accelerate.Type ( ScalarType )
-import Data.Array.Accelerate.Representation.Shape (ShapeR, DIM1)
+import Data.Array.Accelerate.Representation.Shape (ShapeR, DIM1, DIM0)
 
 data TensorArg env sh a where
   TensorArg :: ShapeR sh -> BaseVars env sh -> ScalarType a -> BaseVar env (Buffer a) -> TensorArg env sh a
@@ -59,6 +59,8 @@ data TensorKernel env where
   TensorWhere       :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorKernel env
   TensorGather      :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env sh Int -> TensorArg env sh a -> TensorKernel env
   TensorCast        :: (TensorType a, TensorType b) => TensorArg env sh a -> TensorArg env sh b -> TensorKernel env
+  TensorRange       :: OneOf TFInt' a => TensorArg env DIM0 a -> TensorArg env DIM0 a -> TensorArg env DIM0 a -> TensorArg env DIM1 a -> TensorKernel env
+  TensorSize        :: OneOf TFAll a => TensorArg env DIM1 a -> TensorArg env DIM0 Int -> TensorKernel env
 
   -- scatter operations
   TensorScatter :: TensorType a => ScatterFun -> TensorArg env DIM1 a -> TensorArg env DIM1 Int -> TensorArg env DIM1 a -> TensorKernel env
@@ -167,6 +169,8 @@ compileOperation TWhere (aIn :>: aOut :>: _)                                = Te
 compileOperation TGather (aIn1 :>: aIn2 :>: aOut :>: _)                     = TensorGather (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TCast (aIn :>: aOut :>: _)                                 = TensorCast (arg aIn) (arg aOut)
 compileOperation (TTensorScatter scatterFun) (aMut :>: aIn1 :>: aIn2 :>: _) = TensorScatter scatterFun (arg aMut) (arg aIn1) (arg aIn2)
+compileOperation TRange (aIn1 :>: aIn2 :>: aIn3 :>: aOut :>: _)             = TensorRange (arg aIn1) (arg aIn2) (arg aIn3) (arg aOut)
+compileOperation TSize (aIn :>: aOut :>: _)                                 = TensorSize (arg aIn) (arg aOut)
 
 compileOperation TAdd (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorAdd (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TMul (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorMul (arg aIn1) (arg aIn2) (arg aOut)

@@ -59,7 +59,7 @@ import Data.Array.Accelerate.Trafo.Exp.Substitution
     ( weakenVars, SinkExp(weakenE), rebuildNoArrayInstr )
 import Data.Type.Equality ( type (:~:)(Refl) )
 import Data.Array.Accelerate.Representation.Shape
-    ( dim1, shapeType, ShapeR(..), DIM1 )
+    ( dim1, shapeType, ShapeR(..), DIM1, dim0 )
 import Prelude hiding (exp)
 
 import Data.Accelerate.TensorFlow.Type
@@ -147,6 +147,9 @@ instance DesugarAcc TensorOp where
           (TupRpair TupRunit (k (w''' .> w'' .> w'))) 
           (weakenVars (w''' .> w'' .> w' .> w) gvb))
       )
+
+  -- mkGenerate :: Arg env (Fun' (sh -> t)) -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
+  -- mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb)
 
   mkPermute :: Arg env (Fun' (e -> e -> e)) -> Arg env (Mut sh' e) -> Arg env (Fun' (sh -> PrimMaybe sh')) -> Arg env (In sh e) -> OperationAcc TensorOp env ()
   mkPermute
@@ -376,6 +379,7 @@ mkExp env (Foreign _ _ fallback exp) (ArgArray _ (ArrayR sh t) gv gvb)
 mkExp _ VecPack {} _   = error "VecPack operation not supported by TensorFlow backend."
 mkExp _ VecUnpack {} _ = error "VecUnpack operation not supported by TensorFlow backend."
 mkExp _ Case {} _      = error "Case operation not supported by TensorFlow backend."
+mkExp _ While {} _     = error "While operation not supported by TensorFlow backend."
 
 -- mkExp env (While (Lam lhs (Body cond)) (Lam lhs' (Body body)) exp) (ArgArray _ (ArrayR sh t) gv gvb) 
 --   | DeclareVars lhs'' w k <- declareVars $ buffersR $ expType cond
@@ -579,7 +583,6 @@ mkPrimFun2 fun1 fun2 env exp (ArgArray _ (ArrayR sh (TupRpair t1 t2)) gv (TupRpa
     (ArgArray Out (ArrayR sh t2) gv gvb2)
   )
 mkPrimFun2 _ _ _ _ _ = error "impossible"
-
 
 booleanMask :: TypeR a -> Arg env (In DIM1 Word8) -> GroundVars env (Buffers a) -> GroundVars env (Buffers a) -> PreOpenAcc TensorOp env ()
 booleanMask TupRunit _ _ gvb = Return gvb

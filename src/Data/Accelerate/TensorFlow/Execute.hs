@@ -88,6 +88,7 @@ import Data.Array.Accelerate.Pretty.Operation (prettyBuffer)
 import qualified Data.Array.Accelerate.Pretty as Pretty
 import Data.Array.Accelerate.Representation.Elt (showElt)
 import qualified Debug.Trace
+import Data.Vector (Vector)
 
 data TensorFlow where
   TensorFlow :: TensorFlow
@@ -243,6 +244,9 @@ executeKernel env (TensorScatter scatterFun aMut aIn1 aIn2)
             ScatterFunSub    -> TF.tensorScatterSub
             ScatterFunUpdate -> TF.tensorScatterUpdate
 
+executeKernel env (TensorRange aIn1 aIn2 aIn3 aOut)   = executeTernaryKernel env aIn1 aIn2 aIn3 aOut TF.range
+executeKernel env (TensorSize aIn aOut)               = executeUnaryKernel env aIn aOut TF.size
+
 executeKernel env (TensorAdd aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.add
 executeKernel env (TensorMul aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.mul
 executeKernel env (TensorSub aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.sub
@@ -346,7 +350,7 @@ executeTernaryKernel env (TensorArg inShR1 inShVars1 _ (Var _ inIdx1)) (TensorAr
     inTensor3 <- buildTensor stIn3 (TF.Shape inSh3) inRef3
 
     outSh <- liftIO $ getShape env outShR outShVars
-    liftIO $ writeIORef outRef $ Build (TF.Shape outSh) $ TF.ensureShape (TF.Shape outSh) $ tfOp inTensor1 inTensor2 inTensor3
+    liftIO $ writeIORef outRef $ Build (TF.Shape outSh) $ tfOp inTensor1 inTensor2 inTensor3
     return TupRunit
 executeTernaryKernel _ _ _ _ _ _ = error "impossible"
 
@@ -625,3 +629,21 @@ debugTensorRef st ref = do
 -- executeKernel env (TensorLogicalAnd aIn1 aIn2 aOut)   = debugExecuteBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.cast (TF.logicalAnd (TF.cast x) (TF.cast y))) "logicalAnd"
 -- executeKernel env (TensorLogicalOr aIn1 aIn2 aOut)    = debugExecuteBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.cast (TF.logicalOr (TF.cast x) (TF.cast y))) "logicalOr"
 -- executeKernel env (TensorLogicalNot aIn aOut)         = debugExecuteUnaryKernel env aIn aOut (TF.cast . TF.logicalNot . TF.cast) "logicalNot"
+
+ivo :: IO ()
+ivo = do 
+  let tensor = TF.constant (TF.Shape [10]) [0,1,2,3,4,5,6,7,8,9 :: Int64]
+  let indices = TF.reshape (TF.constant (TF.Shape [20]) [0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9 :: Int64]) (TF.constant (TF.Shape [2]) [20,1 :: Int64])
+  let updates = TF.constant (TF.Shape [20]) [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 :: Int64]
+  let out = TF.tensorScatterAdd tensor indices updates :: TF.Tensor TF.Build Int64
+  x :: Vector Int64 <- TF.runSession $ TF.run out
+  print x
+
+ivo2 :: IO ()
+ivo2 = do 
+  let tensor = TF.constant (TF.Shape [6]) [0,1,2,3,4,5 :: Int64]
+  let indices = TF.reshape (TF.constant (TF.Shape [5]) [0,0,0,0,0 :: Int64]) (TF.constant (TF.Shape [2]) [5,1 :: Int64])
+  let updates = TF.constant (TF.Shape [5]) [0,1,2,3,4 :: Int64]
+  let out = TF.tensorScatterUpdate tensor indices updates :: TF.Tensor TF.Build Int64
+  x :: Vector Int64 <- TF.runSession $ TF.run out
+  print x

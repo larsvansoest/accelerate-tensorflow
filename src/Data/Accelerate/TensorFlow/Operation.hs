@@ -15,7 +15,7 @@
 module Data.Accelerate.TensorFlow.Operation where
 
 import Data.Accelerate.TensorFlow.Type
-    ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod )
+    ( TFOrd, OneOf, TFNum, TFAll, TFFloat, TensorType, TFInt, TFNum', TFMod, TFInt' )
 import Data.Array.Accelerate.AST.Operation
     ( PrimBool, Mut, Out, In, NFData'(..), Var', GroundVars, Var (..), Arg (ArgArray), PreArgs ((:>:), ArgsNil), Args )
 import Data.Array.Accelerate
@@ -30,7 +30,7 @@ import Data.Array.Accelerate.Trafo.Partitioning.ILP.Labels (LabelledArg(..))
 import Data.Array.Accelerate.Trafo.Partitioning.ILP.Graph
     ( LabelledArgOp(LOp) )
 import Data.Array.Accelerate.Analysis.Hash.Exp (intHost, hashQ, encodeScalarConst, Builder, encodeScalarType)
-import Data.Array.Accelerate.Representation.Shape (DIM1)
+import Data.Array.Accelerate.Representation.Shape (DIM1, DIM0)
 import Data.Array.Accelerate.Type (ScalarType)
 import Data.Array.Accelerate.Analysis.Match ((:~:) (..))
 import Data.Array.Accelerate.Representation.Type (TypeR, TupR (..), Distributes (reprIsSingle))
@@ -46,7 +46,9 @@ data TensorOp op where
   TSelect      :: OneOf TFAll a => TensorOp (In sh PrimBool -> In sh a -> In sh a -> Out sh a -> ())
   TGather      :: OneOf TFAll a => TensorOp (In DIM1 a -> In sh Int -> Out sh a -> ())
   TWhere       :: OneOf TFAll a => TensorOp (In DIM1 a -> Out DIM1 Int -> ())
-  TCast :: (TensorType a, TensorType b) => TensorOp (In sh a -> Out sh b -> ())
+  TCast        :: (TensorType a, TensorType b) => TensorOp (In sh a -> Out sh b -> ())
+  TRange       :: OneOf TFInt' a => TensorOp (In DIM0 a -> In DIM0 a -> In DIM0 a -> Out DIM1 a -> ())
+  TSize        :: OneOf TFAll a => TensorOp (In DIM1 a -> Out DIM0 Int -> ())
 
   -- operators from Num
   TAdd  :: OneOf TFNum  a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
@@ -123,6 +125,8 @@ instance EncodeOperation TensorOp where
     TWhere -> intHost $(hashQ ("Where" :: String))
     TId -> intHost $(hashQ ("Id" :: String))
     TSelect -> intHost $(hashQ ("Select" :: String))
+    TRange -> intHost $(hashQ ("Range" :: String))
+    TSize -> intHost $(hashQ ("Size" :: String))
     TAdd -> intHost $(hashQ ("Add" :: String))
     TMul -> intHost $(hashQ ("Mul" :: String))
     TSub -> intHost $(hashQ ("Sub" :: String))
@@ -188,6 +192,8 @@ instance PrettyOp TensorOp where
     TGather -> "TGather"
     TWhere -> "TWhere"
     TCast -> "TCast"
+    TRange -> "Range"
+    TSize -> "Size"
     TAdd -> "TAdd"
     TMul -> "TMul"
     TSub -> "TSub"
