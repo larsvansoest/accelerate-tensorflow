@@ -26,9 +26,9 @@ import Data.Array.Accelerate.AST.Operation
       Out,
       In,
       Mut,
-      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe )
+      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe, unique, PreOpenAfun (..), PrimBool, paramIn )
 import Data.Array.Accelerate.AST.LeftHandSide
-    ( LeftHandSide(..) )
+    ( LeftHandSide(..), lhsToTupR )
 import Data.Array.Accelerate.Backend
     ( DesugarAcc(mkGenerate, mkPermute, mkMap) )
 import Data.Array.Accelerate.Type
@@ -375,8 +375,27 @@ mkExp env (Foreign _ _ fallback exp) (ArgArray _ (ArrayR sh t) gv gvb)
 -- Not supported
 mkExp _ VecPack {} _   = error "VecPack operation not supported by TensorFlow backend."
 mkExp _ VecUnpack {} _ = error "VecUnpack operation not supported by TensorFlow backend."
-mkExp _ Case {} _      = error "Case operation not supported by TensorFlow backend." -- TODO: check with Ivo
-mkExp _ While {} _     = error "While operation not supported by TensorFlow backend."
+mkExp _ Case {} _      = error "Case operation not supported by TensorFlow backend."
+
+-- mkExp env (While (Lam lhs (Body cond)) (Lam lhs' (Body body)) exp) (ArgArray _ (ArrayR sh t) gv gvb) 
+--   | DeclareVars lhs'' w k <- declareVars $ buffersR $ expType cond
+--   =
+--   aletUnique lhs'' (desugarAlloc (ArrayR sh (expType cond)) (fromGrounds gv)) $
+--   Alet (LeftHandSideWildcard TupRunit) TupRunit
+--   (mkExp (weakenEnv w env) (Let lhs (weakenArrayInstr w exp) (weakenArrayInstr w cond)) (ArgArray Out (ArrayR sh (expType cond)) (weakenVars w gv) (k weakenId))) $
+--   Awhile
+--     TupRunit
+--     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique (LeftHandSideWildcard TupRunit) (mkExp (weakenEnv w env) (Let lhs (weakenArrayInstr w exp) (weakenArrayInstr w cond)) (ArgArray Out (ArrayR sh (expType cond)) (weakenVars w gv) (k weakenId))) (Return _))))
+--     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique (LeftHandSideWildcard TupRunit) (mkExp (weakenEnv w env) (Let lhs' (weakenArrayInstr w exp) (weakenArrayInstr w body)) (ArgArray Out (ArrayR sh t) (weakenVars w gv) (weakenVars w gvb))) (Return TupRunit))))
+--     TupRunit
+
+-- mkExp env (While (Lam lhs (Body cond)) (Lam lhs' (Body body)) exp) aOut@(ArgArray _ (ArrayR sh t) gv gvb) 
+--   =
+--   Awhile
+--     TupRunit
+--     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique lhs'' (Compute cond) (Return _))))
+--     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique (LeftHandSideWildcard TupRunit) (mkExp env (Let lhs' exp body) aOut) (Return TupRunit))))
+--     TupRunit
 
 mkExp _ _ _ = error "impossible"
 
@@ -444,7 +463,7 @@ mkPrimFun (PrimExpFloating ft) | OneOfDict <- tfFloatDict ft          = mkUnaryP
 mkPrimFun (PrimSqrt ft) | OneOfDict <- tfFloatDict ft                 = mkUnaryPrimFun TSqrt
 mkPrimFun (PrimLog ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TLog
 mkPrimFun (PrimFPow ft) | OneOfDict <- tfFloatDict ft                 = mkBinaryPrimFun TPow
-mkPrimFun (PrimLogBase ft) | OneOfDict <- tfFloatDict ft              = undefined -- mkBinaryPrimFun TLog1p
+mkPrimFun (PrimLogBase ft) | OneOfDict <- tfFloatDict ft              = mkBinaryPrimFun TLogBase
 
 mkPrimFun (PrimTruncate _ _)                                          = error "Truncate to 0 not supported by TensorFlow."
 mkPrimFun (PrimRound ft it) 

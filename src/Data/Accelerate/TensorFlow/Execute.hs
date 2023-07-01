@@ -37,7 +37,7 @@ import Data.Array.Accelerate.AST.Schedule
 import Data.Array.Accelerate.Representation.Type
     ( TupR(..), TypeR, mapTupR )
 import Data.Accelerate.TensorFlow.Type
-    ( VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict, toType64, toType64', fromType64' )
+    ( VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict, toType64, toType64', fromType64', TFNum, OneOf, TFInt )
 import Data.IORef ( IORef, newIORef, readIORef, writeIORef )
 import Data.Array.Accelerate.Type ( ScalarType, Int64, Int32 )
 import Data.Array.Accelerate.Array.Buffer
@@ -65,6 +65,16 @@ import qualified TensorFlow.Ops                                     as TF
 import qualified TensorFlow.Core                                    as TF
 import qualified TensorFlow.Session                                 as TF
 import qualified TensorFlow.GenOps.Core                             as TF hiding (shape, placeholder)
+
+-- dotp :: TF.Tensor TF.Build Int64 -> TF.Tensor TF.Build Int64 -> TF.Tensor TF.Build Int64
+-- dotp xs ys = TF.reduceSum $ TF.mul xs ys
+
+-- dotp' :: IO (S.Vector Int64)
+-- dotp' = let xs = TF.vector [1, 2, 3, 4]
+--             ys = TF.vector [1, 2, 3, 4]
+--         in TF.runSession $ TF.run $ dotp xs ys
+
+
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Data.Array.Accelerate.Interpreter
     ( evalExpM, toBool, EvalArrayInstr(EvalArrayInstr) )
@@ -267,6 +277,7 @@ executeKernel env (TensorAtanh aIn aOut)              = executeUnaryKernel env a
 executeKernel env (TensorExp aIn aOut)                = executeUnaryKernel env aIn aOut TF.exp
 executeKernel env (TensorSqrt aIn aOut)               = executeUnaryKernel env aIn aOut TF.sqrt
 executeKernel env (TensorLog aIn aOut)                = executeUnaryKernel env aIn aOut TF.log
+executeKernel env (TensorLogBase aIn1 aIn2 aOut)      = executeBinaryKernel env aIn1 aIn2 aOut (\x y -> TF.div (TF.log y) (TF.log x))
 executeKernel env (TensorPow aIn1 aIn2 aOut)          = executeBinaryKernel env aIn1 aIn2 aOut TF.pow
 executeKernel env (TensorLog1p aIn aOut)              = executeUnaryKernel env aIn aOut TF.log1p
 executeKernel env (TensorAtan2 aIn1 aIn2 aOut)        = executeBinaryKernel env aIn1 aIn2 aOut TF.atan2

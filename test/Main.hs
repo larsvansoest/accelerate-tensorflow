@@ -94,6 +94,13 @@ type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 -- main = do putStrLn $ test @SequentialSchedule @TensorKernel $ replicateAcc
 --           defaultMain tRep
 
+-- tLogBase :: TestTree
+-- tLogBase = testGroup "logBase"
+--   [ testCase "logBase" $ assertAcc (map (logBase (2 :: Exp Float)) (use (fromList (Z:.10) [1..] :: Vector Float)))
+--   ]
+
+-- main :: IO ()
+-- main = do defaultMain tLogBase
 
 main :: IO ()
 main = defaultMain tests
@@ -1006,7 +1013,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
             tRealFrac,
             tRealFloat
           ]
-          where vec1 = fromList (Z:.10) [1..] :: Vector Int64
+          where vec1 = fromList (Z:.10) [1..] :: Vector Int32
                 vec1' = fromList (Z:.10) [1..] :: Vector Float
                 tNum = testGroup "Num"
                   [
@@ -1027,7 +1034,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                           [ testCase "plus" $ assertAcc (map (+ 1) (use vec1))
                           ]
                         tMinus = testGroup "minus (-)"
-                          [ testCase "minus" $ assertAcc (map (\x -> x - 1) (use vec1) :: Acc (Vector Int64))
+                          [ testCase "minus" $ assertAcc (map (\x -> x - 1) (use vec1) :: Acc (Vector Int32))
                           ]
                         tTimes = testGroup "times (*)"
                           [ testCase "times" $ assertAcc (map (* 2) (use vec1))
@@ -1200,10 +1207,10 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                           [ testCase "floor" $ assertAcc (map floor (use vec1') :: Acc (Vector Int64))
                           ]
                         tDiv' = testGroup "div"
-                          [ testCase "div" $ assertAcc (map (div (2 :: Exp Int64)) (use vec1) :: Acc (Vector Int64))
+                          [ testCase "div" $ assertAcc (map (div (2 :: Exp Int32)) (use vec1) :: Acc (Vector Int32))
                           ]
                         tMod' = testGroup "mod"
-                          [ testCase "mod" $ assertAcc (map (mod (2 :: Exp Int64)) (use vec1) :: Acc (Vector Int64))
+                          [ testCase "mod" $ assertAcc (map (mod (2 :: Exp Int32)) (use vec1) :: Acc (Vector Int32))
                           ]
                         tDivMod' = testGroup "divMod"
                           [ --testCase "divMod" $ assertAcc (map (Data.Array.Accelerate.fst . divMod' (2 :: Exp Int64)) (use vec1) :: Acc (Vector (Int64, Int64)))

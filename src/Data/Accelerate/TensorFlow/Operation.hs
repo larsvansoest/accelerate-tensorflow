@@ -86,6 +86,7 @@ data TensorOp op where
   TSqrt       :: OneOf TFFloat a => TensorOp (In sh a -> Out sh a -> ())
   TExp        :: OneOf TFFloat a => TensorOp (In sh a -> Out sh a -> ())
   TLog        :: OneOf TFFloat a => TensorOp (In sh a -> Out sh a -> ())
+  TLogBase    :: OneOf TFFloat a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
   TPow        :: OneOf TFFloat a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
   TLog1p      :: OneOf TFFloat a => TensorOp (In sh a -> Out sh a -> ())
   TAtan2      :: OneOf TFFloat a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
@@ -147,6 +148,7 @@ instance EncodeOperation TensorOp where
     TSqrt -> intHost $(hashQ ("Sqrt" :: String))
     TExp -> intHost $(hashQ ("Exp" :: String))
     TLog -> intHost $(hashQ ("Log" :: String))
+    TLogBase -> intHost $(hashQ ("LogBase" :: String))
     TPow -> intHost $(hashQ ("Pow" :: String))
     TLog1p -> intHost $(hashQ ("Log1p" :: String))
     TAtan2 -> intHost $(hashQ ("Atan2" :: String))
@@ -217,6 +219,7 @@ instance PrettyOp TensorOp where
     TSqrt -> "TSqrt"
     TExp -> "TExp"
     TLog -> "TLog"
+    TLogBase -> "TLogBase"
     TPow -> "TPow"
     TLog1p -> "TLog1p"
     TAtan2 -> "TAtan2"

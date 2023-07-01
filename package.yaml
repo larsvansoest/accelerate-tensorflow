@@ -23,7 +23,7 @@ flags:
   llvm-cpu:
     description: Generate parallel CPU code
     manual: true
-    default: false
+    default: true
   llvm-ptx:
     description: Generate code for NVIDIA GPUs
     manual: true

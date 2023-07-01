@@ -101,6 +101,7 @@ data TensorKernel env where
   TensorExp        :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorSqrt       :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorLog        :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
+  TensorLogBase    :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorPow        :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorLog1p      :: OneOf TFFloat a => TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
 
@@ -201,6 +202,7 @@ compileOperation TAtanh (aIn :>: aOut :>: _)                                = Te
 compileOperation TSqrt (aIn :>: aOut :>: _)                                 = TensorSqrt (arg aIn) (arg aOut)
 compileOperation TExp (aIn :>: aOut :>: _)                                  = TensorExp (arg aIn) (arg aOut)
 compileOperation TLog (aIn :>: aOut :>: _)                                  = TensorLog (arg aIn) (arg aOut)
+compileOperation TLogBase (aIn1 :>: aIn2 :>: aOut :>: _)                    = TensorLogBase (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TPow (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorPow (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TLog1p (aIn :>: aOut :>: _)                                = TensorLog1p (arg aIn) (arg aOut)
 compileOperation TAtan2 (aIn1 :>: aIn2 :>: aOut :>: _)                      = TensorAtan2 (arg aIn1) (arg aIn2) (arg aOut)
