@@ -45,6 +45,7 @@ dependencies:
 - tasty-hunit
 - tasty-quickcheck
 - criterion
+- microlens
 
 library:
   source-dirs: src
@@ -95,6 +96,7 @@ tests:
       - tasty-hedgehog
       - tasty-hunit
       - tasty-quickcheck
+      - microlens
     when:
       - condition: flag(llvm-cpu)
         cpp-options: -DACCELERATE_LLVM_NATIVE_BACKEND

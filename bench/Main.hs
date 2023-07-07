@@ -18,7 +18,7 @@ generateEven = generate (I1 5) (\(I1 i) -> fromIntegral $ i `mod` 2)
 
 histogram :: Acc (Vector Int) -> Acc (Vector Int)
 histogram xs =
-  let zeros = fill (shape xs) 0
+  let zeros = fill (constant (Z:.10)) 0
       ones  = fill (shape xs) 1
   in
   permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones

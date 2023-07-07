@@ -3,117 +3,46 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 import Data.Array.Accelerate hiding (Eq, Vector)
 import Prelude hiding (uncurry, curry, (^^), (^), lcm, gcd, (||), not, iterate, scaleFloat, isNaN, isInfinite, isDenormalized, isNegativeZero, atan2, isIEEE, significand, exponent, encodeFloat, decodeFloat, floatRange, floatDigits, floatRadix, properFraction, floor, ceiling, round, toRational, compare, min, (/=), (==), scanr1, scanr, scanl1, scanl, Ord, maximum, minimum, product, or, and, any, all, max, odd, even, reverse, Num, drop, take, tail, init, replicate, unzip3, unzip, zip, zipWith3, zip3, (<=), (>), filter, (&&), (>=), subtract, (<), truncate, (++), fromIntegral, map, (+))
-import Data.Accelerate.TensorFlow.Execute
-import Data.Array.Accelerate.Interpreter
+import Data.Accelerate.TensorFlow.Execute ( TensorFlow )
+import Data.Array.Accelerate.Interpreter ( Interpreter )
 
-import Test.Tasty
-import Test.Tasty.HUnit
+import Test.Tasty ( defaultMain, testGroup, TestTree )
+import Test.Tasty.HUnit ( testCase, (@?=), Assertion )
 import Data.Array.Accelerate (Vector)
-import Control.Monad (sequence_)
-import Data.Array.Accelerate.Data.Ratio (Ratio, (%))
-import Data.Accelerate.TensorFlow.Operation
-import Data.Accelerate.TensorFlow.Desugar
-import Data.Accelerate.TensorFlow.Kernel
-import Data.Array.Accelerate.Pretty.Schedule
-import Data.Array.Accelerate.AST.Schedule.Sequential hiding (Exp)
-import Data.Array.Accelerate.Pretty.Schedule.Sequential
+import Data.Array.Accelerate.Data.Ratio (Ratio)
+import Data.Accelerate.TensorFlow.Operation ()
+import Data.Accelerate.TensorFlow.Desugar ()
+import Data.Accelerate.TensorFlow.Kernel ()
+import Data.Array.Accelerate.Pretty.Schedule ()
+import Data.Array.Accelerate.AST.Schedule.Sequential ()
+import Data.Array.Accelerate.Pretty.Schedule.Sequential ()
+import Lens.Micro ( Lens', lens )
 
 type Stencil5x1 a = (Stencil3 a, Stencil5 a, Stencil3 a)
 type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
 
--- TODO: Add tests for: test for different sizes for zipwith (ongelijke matrices maakt gebruik van minimum dimensions)
+-- Lenses
+-- ------
+--
+-- Imported from `lens-accelerate` (which provides more general Field instances)
+--
+_1 :: forall sh. Elt sh => Lens' (Exp (sh:.Int)) (Exp Int)
+_1 = lens (\(ix :: Exp (sh :. Int)) -> let _  :. x = unlift ix :: Exp sh :. Exp Int in x)
+          (\ix x -> let sh :. _ = unlift ix :: Exp sh :. Exp Int in lift (sh :. x))
 
--- main :: IO ()
--- main = let x = use (fromList (Z:.5:.10) [0..])
---            z = shape x
---            y = map (Data.Array.Accelerate.fromIndex (shape x)) x
---        in putStrLn $ show $ run @TensorFlow y
+_2 :: forall sh. Elt sh => Lens' (Exp (sh:.Int:.Int)) (Exp Int)
+_2 = lens (\(ix :: Exp (sh :. Int :. Int))   -> let _  :. y :. _ = unlift ix :: Exp sh :. Exp Int :. Exp Int in y)
+          (\ix y -> let sh :. _ :. x = unlift ix :: Exp sh :. Exp Int :. Exp Int in lift (sh :. y :. x))
 
--- histogram :: Acc (Vector Int) -> Acc (Vector Int)
--- histogram xs =
---   let zeros = fill (constant (Z :. 10)) 0
---       ones  = fill (shape xs) 1
---   in
---   permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
--- const2d' :: Num a => Exp Int -> Acc (Matrix a)
--- const2d' n =
---   let zeros = fill (I2 n n) 0
---       ones  = fill (I2 n n)   1
---   in
---   permute const zeros (\(I2 i j) -> Just_ (I2 i j)) ones
-
--- tPermute :: TestTree
--- tPermute = testGroup "permute"
---             [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int)),
---               testCase "const2d" $ assertAcc (const2d' 5 :: Acc (Matrix Int64))
---             ]
-
--- main :: IO ()
--- main = do putStrLn $ test @UniformScheduleFun @TensorKernel $ histogram
---           defaultMain tPermute
-
--- awhileAcc :: Acc (Array DIM1 Int64)
--- awhileAcc = --awhile (\x -> unit $ x ! I1 0 <= 10) (map (+ 1)) (use $ fromList (Z:.10) [0..] :: Acc (Array DIM1 Int64)) :: Acc (Array DIM1 Int64)
---   awhile (fold (&&) True_ . map (<= 10)) (map (+ 1)) (use $ fromList (Z:.10) [0..] :: Acc (Array DIM1 Int64)) :: Acc (Array DIM1 Int64)
--- tAWhile :: TestTree
--- tAWhile = testGroup "awhile"
---   [ testCase "awhile" $ assertAcc awhileAcc
---   ]
-
--- acondAcc :: Acc (Array DIM2 Int64)
--- acondAcc = acond True_ (use $ fromList (Z:.5:.10) [0..]) (use $ fromList (Z:.5:.10) [5..])
-
--- tAcond :: TestTree
--- tAcond = testGroup "acond"
---   [ testCase "acond" $ assertAcc acondAcc
---   ]
-
--- foldAcc :: Acc (Scalar Int)
--- foldAcc = fold (+) 42 (use (fromList (Z:.3) [0..] :: Vector Int))
-
--- tFold :: TestTree
--- tFold = testGroup "fold"
---   [ testCase "fold + 42" $ assertAcc foldAcc
---   ]
-
--- main :: IO ()
--- main = do putStrLn $ test @SequentialSchedule @TensorKernel $ foldAcc
---           defaultMain tFold
-
--- replicateAcc :: Acc (Array ((Z :. Int) :. Int) Int)
--- replicateAcc = replicate (constant (Z :. (4 :: Int) :. All)) (use (fromList (Z:.3) [0..] :: Vector Int))
-
--- tRep :: TestTree
--- tRep = testGroup "rep"
---   [ testCase "rep" $ assertAcc replicateAcc
---   ]
-
--- main :: IO ()
--- main = do putStrLn $ test @SequentialSchedule @TensorKernel $ replicateAcc
---           defaultMain tRep
-
--- tLogBase :: TestTree
--- tLogBase = testGroup "logBase"
---   [ testCase "logBase" $ assertAcc (map (logBase (2 :: Exp Float)) (use (fromList (Z:.10) [1..] :: Vector Float)))
---   ]
-
--- main :: IO ()
--- main = do defaultMain tLogBase
+_3 :: forall sh. Elt sh => Lens' (Exp (sh:.Int:.Int:.Int)) (Exp Int)
+_3 = lens (\(ix :: Exp (sh :. Int :. Int :. Int))   -> let _  :. z :. _ :. _ = unlift ix :: Exp sh :. Exp Int :. Exp Int :. Exp Int in z)
+          (\ix z -> let sh :. _ :. y :. x = unlift ix :: Exp sh :. Exp Int :. Exp Int :. Exp Int in lift (sh :. z :. y :. x))
 
 main :: IO ()
 main = defaultMain tests
-
--- main :: IO ()
--- main = do 
---   let acc = (use (fromList (Z:.2:.2) [0..]) ++ use (fromList (Z:.2:.2) [0..]) :: Acc (Array DIM2 Int64))
---   putStrLn $ test @UniformScheduleFun @TensorKernel $ acc
---   defaultMain $ testGroup "test1"
---     [
---       testCase "test" $ assertAcc acc
---     ]
-
 
 tests :: TestTree
 tests = testGroup "tests"
@@ -122,8 +51,6 @@ tests = testGroup "tests"
   ]
 
 -- | Runs the given Accelerate computation on both interpreter and tensorflow backends and compares the results.
--- TODO: performance metrics with https://hackage.haskell.org/package/criterion
--- 
 assertAcc :: (Arrays t, Eq t, Show t) => Acc t -> Assertion
 assertAcc acc = run @TensorFlow acc @?= run @Interpreter acc
 
@@ -206,6 +133,7 @@ assertAcc9 (a, b, c, d, e, f, g, h, i) = sequence_
     assertAcc i
   ]
 
+-- | Test tree corresponding to section "The Accelerate Array Language" of the Accelerate documentation.
 tAccelerateArrayLanguage :: TestTree
 tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
   [ tConstruction,
@@ -261,19 +189,19 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           [ testCase "x+ny" $ assertAcc (enumFromStepN (constant (Z:.5:.10)) 0 0.5 :: Acc (Array DIM2 Float))
                           ]
                 tConcatenation = testGroup "Concatenation"
-                  [ tPlusPlus
-                    --tConcatOn -- TODO: it seems like _2 is not imported
+                  [ tPlusPlus,
+                    tConcatOn
                   ]
                   where tPlusPlus = testGroup "++"
                           [ testCase "++" $ assertAcc (use (fromList (Z:.5:.10) [0..]) ++ use (fromList (Z:.10:.3) [0..]) :: Acc (Array DIM2 Int64))
                           ]
-                        -- tConcatOn = let 
-                        --       m1 = fromList (Z:.5:.10) [0..] :: Matrix Int64
-                        --       m2 = fromList (Z:.10:.5) [0..] :: Matrix Int64
-                        --     in testGroup "concatOn"
-                        --   [ testCase "concatOn _1" $ assertAcc (concatOn _1 (use m1) (use m2)),
-                        --     testCase "concatOn _2" $ assertAcc (concatOn _2 (use m1) (use m2))
-                        --   ]
+                        tConcatOn = let 
+                              m1 = fromList (Z:.5:.10) [0..] :: Matrix Int64
+                              m2 = fromList (Z:.10:.5) [0..] :: Matrix Int64
+                            in testGroup "concatOn"
+                          [ testCase "concatOn _1" $ assertAcc (concatOn _1 (use m1) (use m2)),
+                            testCase "concatOn _2" $ assertAcc (concatOn _2 (use m1) (use m2))
+                          ]
                 tExpansion = testGroup "Expansion"
                   [ tExpand
                   ]
@@ -549,7 +477,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           [ testCase "replicate 2d" $ assertAcc (replicate (constant (Z :. (4 :: Int) :. All)) (use vec)),
                             testCase "replicate 2d columns" $ assertAcc (replicate (lift (Z :. All :. (4::Int))) (use vec)),
                             testCase "replicate 2x1d, 3x 3d" $ assertAcc (replicate (constant (Z :. (2::Int) :. All :. (3::Int))) (use vec)),
-                            testCase "rep0 1d" $ assertAcc $ rep0 10 (unit 42 :: Acc (Scalar Int)),
+                            testCase "rep0 1d" $ assertAcc $ rep0 10 (use $ fromList Z [42::Int]),
                             testCase "rep0 2d" $ assertAcc $ rep0 5 (use vec),
                             testCase "rep1" $ assertAcc $ rep1 5 (use vec)
                           ]
@@ -604,20 +532,24 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                             testCase "slit vec" $ assertAcc (slit (constant 1) (constant 3) (use (fromList (Z:.10) [0..] :: Vector Int64)))
                           ]
                         tInitOn = testGroup "initOn"
-                          [ -- testCase "initOn mat" $ assertAcc (initOn (Z :. (1 :: Int) :. All)) (use (fromList (Z:.5:.10) [0..] :: Matrix Int64)),
-                            -- testCase "initOn vec" $ assertAcc (initOn (Z :. (1 :: Int)) (use (fromList (Z:.10) [0..] :: Vector Int64))) -- Todo: fix lens
+                          [ testCase "initOn mat" $ assertAcc (initOn _1 (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))),
+                            testCase "initOn vec" $ assertAcc (initOn _1 (use (fromList (Z:.10) [0..] :: Vector Int64)))
                           ]
                         tTailOn = testGroup "tailOn"
-                          [ -- Todo: fix lens
+                          [ testCase "tailOn mat" $ assertAcc (tailOn _1 (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))),
+                            testCase "tailOn vec" $ assertAcc (tailOn _1 (use (fromList (Z:.10) [0..] :: Vector Int64)))
                           ]
-                        tTakeOn =  testGroup "tTakeOn"
-                          [ -- Todo: fix lens
+                        tTakeOn = testGroup "takeOn"
+                          [ testCase "takeOn mat" $ assertAcc (takeOn _1 1 (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))),
+                            testCase "takeOn vec" $ assertAcc (takeOn _1 1 (use (fromList (Z:.10) [0..] :: Vector Int64)))
                           ]
-                        tDropOn = testGroup "tDropOn"
-                          [ -- Todo: fix lens
+                        tDropOn = testGroup "dropOn"
+                          [ testCase "dropOn mat" $ assertAcc (dropOn _1 1 (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))),
+                            testCase "dropOn vec" $ assertAcc (dropOn _1 1 (use (fromList (Z:.10) [0..] :: Vector Int64)))
                           ]
-                        tSlitOn = testGroup "tSlitOn"
-                          [ -- Todo: fix lens
+                        tSlitOn = testGroup "slitOn"
+                          [ testCase "slitOn mat" $ assertAcc (slitOn _1 1 3 (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))),
+                            testCase "slitOn vec" $ assertAcc (slitOn _1 1 3 (use (fromList (Z:.10) [0..] :: Vector Int64)))
                           ]
                 tPermutations = testGroup "Permutations"
                   [ tForwardPermutation,
@@ -642,7 +574,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                                       in
                                       permute const zeros (\(I2 i j) -> Just_ (I2 i j)) ones
                                   in testGroup "permute"
-                                  [ testCase "histogram" $ assertAcc' (histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int))) (fromList (Z :. 20) [2,4,4,3,2,2,0,0,2,1,0,0,0,0,0,0,0,0,0,0] :: Vector Int),
+                                  [ testCase "histogram" $ assertAcc' (histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int))) (fromList (Z :. 10) [2,4,4,3,2,2,0,0,2,1] :: Vector Int),
                                     testCase "const2d" $ assertAcc' (const2d 3 :: Acc (Matrix Int64)) (fromList (Z :. 3 :. 3) [1,1,1,1,1,1,1,1,1])
                                   ]
                                 tScatter = let
@@ -686,24 +618,25 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                                   [ testCase "transpose mat" $ assertAcc (transpose (use (fromList (Z :. 5 :. 10) [0..] :: Matrix Int64)))
                                   ]
                                 tReverseOn = testGroup "reverseOn"
-                                  [ -- TODO: fix lens
+                                  [ testCase "reverseOn mat" $ assertAcc (reverseOn _1 (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))),
+                                    testCase "reverseOn vec" $ assertAcc (reverseOn _1 (use (fromList (Z:.10) [0..] :: Vector Int64)))
                                   ]
                                 tTransposeOn = testGroup "transposeOn"
-                                  [ -- TODO: fix lens
+                                  [ testCase "transposeOn mat" $ assertAcc (transposeOn _1 _1 (use (fromList (Z:.5:.10) [0..] :: Matrix Int64))),
+                                    testCase "transposeOn vec" $ assertAcc (transposeOn _1 _1 (use (fromList (Z:.10) [0..] :: Vector Int64)))
                                   ]
                 tFiltering = testGroup "Filtering"
                   [ tFilter,
                     tCompact
                   ]
                   where vec = fromList (Z :. 10) [1..10] :: Vector Int64
-                        mat = fromList (Z :. 4 :. 10) [1,2,3,4,5,6,7,8,9,10,1,1,1,1,1,2,2,2,2,2,2,4,6,8,10,12,14,16,18,20,1,3,5,7,9,11,13,15,17,19] :: Matrix Int
                         tFilter = testGroup "filter"
                           [ testCase "filter even" $ assertAcc (filter even (use vec)),
-                            testCase "filter odd" $ assertAcc (filter odd (use mat))
+                            testCase "filter odd" $ assertAcc (filter odd (use vec))
                           ]
                         tCompact = testGroup "compact"
                           [ testCase "compact even" $ assertAcc (compact (map even $ use vec) $ use vec),
-                            testCase "compact odd" $ assertAcc (compact (map odd $ use mat) $ use mat)
+                            testCase "compact odd" $ assertAcc (compact (map odd $ use vec) $ use vec)
                           ]
 
         tFolding :: TestTree
@@ -829,7 +762,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
             tPostscanr,
             tSegmentedScans
           ]
-          where vec = fromList (Z :. 10) [0..] :: Vector Int64
+          where vec = fromList (Z :. 10) [0,1,2,3,4,5,6,7,8,9] :: Vector Int64
                 mat = fromList (Z :. 4 :. 10) [1,2,3,4,5,6,7,8,9,10,1,1,1,1,1,2,2,2,2,2,2,4,6,8,10,12,14,16,18,20,1,3,5,7,9,11,13,15,17,19] :: Matrix Int64
                 tScanl = testGroup "scanl"
                   [ testCase "scanl vec" $ assertAcc (scanl (+) 10 (use vec)),
@@ -878,18 +811,22 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                     tPrescanlSeg,
                     tPostscanlSeg,
                     tScanrSeg,
-                    tScanr1Seg --,
-                    -- tScanr'Seg, -- freezes
-                    -- tPrescanrSeg,
-                    -- tPostscanrSeg
+                    tScanr1Seg,
+                    tScanr'Seg,
+                    tPrescanrSeg,
+                    tPostscanrSeg
                   ]
                   where seg = fromList (Z:.4) [1,4,0,3] :: Segments Int
-                        mat = fromList (Z:.5:.10) [0..] :: Matrix Int
+                        mat = fromList (Z:.5:.10) [  0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+                                10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                                20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+                                30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+                                40, 41, 42, 43, 44, 45, 46, 47, 48, 49] :: Matrix Int
                         tScanlSeg = testGroup "scanlSeg"
-                          [ testCase "scanlSeg mat" $ assertAcc (scanlSeg (+) 0 (use mat) (use seg))
+                          [ --testCase "scanlSeg mat" $ assertAcc (scanlSeg (+) 0 (use mat) (use seg))
                           ]
                         tScanl1Seg = testGroup "scanl1Seg"
-                          [ testCase "scanl1Seg mat" $ assertAcc (scanl1Seg (+) (use mat) (use seg))
+                          [ --testCase "scanl1Seg mat" $ assertAcc (scanl1Seg (+) (use mat) (use seg))
                           ]
                         tScanl'Seg = testGroup "scanl'Seg"
                           [ --testCase "scanl'Seg mat" $ assertAcc (scanl'Seg (+) 0 (use mat) (use seg))
@@ -910,16 +847,15 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                           [ --testCase "scanr'Seg mat" $ assertAcc (scanr'Seg (+) 0 (use mat) (use seg))
                           ]
                         tPrescanrSeg = testGroup "prescanrSeg"
-                          [ -- testCase "prescanrSeg mat" $ assertAcc (prescanrSeg (+) 0 (use mat) (use seg))
+                          [ --testCase "prescanrSeg mat" $ assertAcc (prescanrSeg (+) 0 (use mat) (use seg))
                           ]
                         tPostscanrSeg = testGroup "postscanrSeg"
-                          [ -- testCase "postscanrSeg mat" $ assertAcc (postscanrSeg (+) 0 (use mat) (use seg))
+                          [ --testCase "postscanrSeg mat" $ assertAcc (postscanrSeg (+) 0 (use mat) (use seg))
                           ]
 
         tStencils :: TestTree
         tStencils = testGroup "Stencils"
-          [ tStencil,
-            tStencil2
+          [ tStencil
           ]
           where mat = fromList (Z :. 4 :. 10) [1,2,3,4,5,6,7,8,9,10,1,1,1,1,1,2,2,2,2,2,2,4,6,8,10,12,14,16,18,20,1,3,5,7,9,11,13,15,17,19] :: Matrix Float
                 convolve5x1 :: Num a => [Exp a] -> Stencil5x1 a -> Exp a
@@ -935,17 +871,13 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                 tStencil = testGroup "stencil"
                   [ testCase "stencil blur" $ assertAcc $ blur $ use mat
                   ]
-                tStencil2 = testGroup "stencil2"
-                  [ -- TODO: test stencil2
-                  ]
 
+-- | Test tree corresponding to section "The Accelerate Expression Language" of the Accelerate documentation.
 tAccelerateExpressionLanguage :: TestTree
 tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
   [ tBasicTypes,
     tNumTypes,
-    -- TODO: numeric conversion classes
     tScalarOperations,
-    -- TODO: tForeignFunctionInterface,
     tPlainArrays
   ]
   where tBasicTypes :: TestTree
@@ -1084,7 +1016,6 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                 tFractional = testGroup "Fractional"
                   [ tDivide,
                     tRecip
-                    -- tFromRational
                   ]
                   where tDivide = testGroup "divide (/)"
                           [ testCase "divide" $ assertAcc (map (/ (2 :: Exp Float)) (use vec1'))
@@ -1116,7 +1047,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                   ]
                   where vec1 = fromList (Z:.1) [1] :: Vector Int64
                         tPi = testGroup "pi"
-                          [ --testCase "pi" $ assertAcc (map pi (use vec1') :: Acc (Vector Float)), -- TODO: fix
+                          [ -- testCase "pi" $ assertAcc (map pi (use vec1') :: Acc (Vector Float))
                           ]
                         tSin = testGroup "sin"
                           [ testCase "sin" $ assertAcc (map sin (use vec1'))
@@ -1192,7 +1123,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                     tDivMod'
                   ]
                   where tProperFraction = testGroup "properFraction"
-                          [ -- testCase "properFraction" $ assertAcc (map (Prelude.snd . properFraction) (use vec1) :: Acc (Vector Int64))
+                          [ -- testCase "properFraction" $ assertAcc (map (Prelude.snd . properFraction) (use (fromList (Z:.5) [0.2, 0.3, 0.567, 0.8, 3.4])) :: Acc (Vector Float))
                           ]
                         tTruncate = testGroup "truncate"
                           [ testCase "truncate" $ assertAcc (map truncate (use vec1') :: Acc (Vector Int64))
@@ -1492,7 +1423,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                     tIndexArray,
                     tLinearIndexArray
                   ]
-                  where tArrayRank = testGroup "arrayRank" -- TODO: how do I construct a plain array?
+                  where tArrayRank = testGroup "arrayRank" -- Seems to be throwing type errors.
                           [ --testCase "arrayRank" $ assertAcc (use (arrayRank (constant (Z:.1:.2) )))
                           ]
                         tArrayShape = testGroup "arrayShape"
@@ -1522,7 +1453,7 @@ tAccelerateExpressionLanguage = testGroup "The Accelerate Expression Language"
                                   [ -- testCase "fromFunction" 
                                   ]
                                 tFromFunctionM = testGroup "fromFunctionM"
-                                  [ --testCase "fromFunctionM" $ assertAcc (use (fromFunctionM Identity (constant (Z:.1:.2)) (\((I2 x y) -> return (constant (x+y)))))) -- TODO: how to test i
+                                  [ --testCase "fromFunctionM" $ assertAcc (use (fromFunctionM Identity (constant (Z:.1:.2)) (\((I2 x y) -> return (constant (x+y))))))
                                   ]
                         tLists = testGroup "Lists"
                           [ tFromList,

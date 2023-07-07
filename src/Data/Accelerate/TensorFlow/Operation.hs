@@ -61,7 +61,7 @@ data TensorOp op where
   -- operators from Integral
   TTruncateDiv :: OneOf TFNum a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
   TTruncateMod :: OneOf TFMod a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
-  TRealDiv     :: OneOf TFNum a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
+  TDiv     :: OneOf TFNum a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
 
   -- operators from Bits & FiniteBits
   TBitwiseAnd :: OneOf TFInt a => TensorOp (In sh a -> In sh a -> Out sh a -> ())
@@ -167,7 +167,7 @@ instance EncodeOperation TensorOp where
     TLogicalAnd -> intHost $(hashQ ("LogicalAnd" :: String))
     TLogicalOr -> intHost $(hashQ ("LogicalOr" :: String))
     TLogicalNot -> intHost $(hashQ ("LogicalNot" :: String))
-    TRealDiv -> intHost $(hashQ ("RealDiv" :: String))
+    TDiv -> intHost $(hashQ ("Div" :: String))
     TBitwiseAnd -> intHost $(hashQ ("BitwiseAnd" :: String))
     TBitwiseOr -> intHost $(hashQ ("BitwiseOr" :: String))
     TBitwiseXor -> intHost $(hashQ ("BitwiseXor" :: String))
@@ -202,7 +202,7 @@ instance PrettyOp TensorOp where
     TSign -> "TSign"
     TTruncateDiv -> "TTruncateDiv"
     TTruncateMod -> "TTruncateMod"
-    TRealDiv -> "TRealDiv"
+    TDiv -> "TDiv"
     TBitwiseAnd -> "TBitwiseAnd"
     TBitwiseOr -> "TBitwiseOr"
     TBitwiseXor -> "TBitwiseXor"

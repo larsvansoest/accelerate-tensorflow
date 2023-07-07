@@ -26,9 +26,9 @@ import Data.Array.Accelerate.AST.Operation
       Out,
       In,
       Mut,
-      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe, unique, PreOpenAfun (..), PrimBool, paramIn )
+      Arg(ArgFun, ArgArray, ArgVar), Var (..), PrimConst (..), Fun', PrimMaybe )
 import Data.Array.Accelerate.AST.LeftHandSide
-    ( LeftHandSide(..), lhsToTupR )
+    ( LeftHandSide(..) )
 import Data.Array.Accelerate.Backend
     ( DesugarAcc(mkGenerate, mkPermute, mkMap) )
 import Data.Array.Accelerate.Type
@@ -38,7 +38,7 @@ import Data.Array.Accelerate.Type
       IntegralType(..),
       NumType(IntegralNumType, FloatingNumType),
       SingleType(NumSingleType),
-      ScalarType(SingleScalarType), BoundedType (..), Int64 )
+      ScalarType(SingleScalarType), BoundedType (..) )
 import Data.Array.Accelerate.Representation.Array
     ( Buffer, Buffers, ArrayR(ArrayR) )
 import Data.Array.Accelerate.Representation.Type
@@ -59,7 +59,7 @@ import Data.Array.Accelerate.Trafo.Exp.Substitution
     ( weakenVars, SinkExp(weakenE), rebuildNoArrayInstr )
 import Data.Type.Equality ( type (:~:)(Refl) )
 import Data.Array.Accelerate.Representation.Shape
-    ( dim1, shapeType, ShapeR(..), DIM1, dim0 )
+    ( dim1, shapeType, ShapeR(..), DIM1 )
 import Prelude hiding (exp)
 
 import Data.Accelerate.TensorFlow.Type
@@ -147,9 +147,6 @@ instance DesugarAcc TensorOp where
           (TupRpair TupRunit (k (w''' .> w'' .> w'))) 
           (weakenVars (w''' .> w'' .> w' .> w) gvb))
       )
-
-  -- mkGenerate :: Arg env (Fun' (sh -> t)) -> Arg env (Out sh t) -> OperationAcc TensorOp env ()
-  -- mkGenerate f (ArgArray _ (ArrayR sh t) gv gvb)
 
   mkPermute :: Arg env (Fun' (e -> e -> e)) -> Arg env (Mut sh' e) -> Arg env (Fun' (sh -> PrimMaybe sh')) -> Arg env (In sh e) -> OperationAcc TensorOp env ()
   mkPermute
@@ -293,7 +290,8 @@ mkExp env (IndexFull slix exp1 exp2) aOut
   = mkExp env (Let lhs exp1 (Let lhs' (weakenE w exp2) (indexFull slix (k w') (k' weakenId)))) aOut
 
 mkExp env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
-  -- todo add preprocess check to throw an error if theres a loop, mem access, etc.
+  -- Throws errors for conditional array indexing: TF.select computes both paths
+  -- as lazy evaluated tensors do not exist
   | DeclareVars lhs w k <- declareVars $ buffersR $ TupRsingle scalarTypeWord8
   , DeclareVars lhs' w' k' <- declareVars $ buffersR t
   , DeclareVars lhs'' w'' k'' <- declareVars $ buffersR t
@@ -312,7 +310,7 @@ mkExp env (Cond cond exp1 exp2) (ArgArray _ (ArrayR sh t) gv gvb)
       (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k' w''))
       (ArgArray In (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (k'' weakenId))
       (ArgArray Out (ArrayR sh t) (weakenVars (w'' .> w' .> w) gv) (weakenVars (w'' .> w' .> w) gvb))
-    ) -- lazy evaluated tensors do not exist, and TSelect evaluates them already
+    ) 
 
 mkExp _ Nil _ = Return TupRunit
 
@@ -322,7 +320,7 @@ mkExp env (ArrayInstr (Index var) exp) (ArgArray _ (ArrayR sh t@(TupRsingle st))
   , i <- expType exp
   , DeclareVars lhs w k <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
   , DeclareVars lhs' w' k' <- declareVars $ buffersR i
-  =  -- To apply gather to 1d array, calculate the dim1 size
+  = -- To apply gather to 1d array, calculate the dim1 size
     aletUnique lhs (Compute (ShapeSize sh (paramsIn' $ fromGrounds gv))) $
     aletUnique lhs' (desugarAlloc (ArrayR sh i) (weakenVars w $ fromGrounds gv)) $
     Alet (LeftHandSideWildcard TupRunit) TupRunit
@@ -384,26 +382,6 @@ mkExp _ VecUnpack {} _ = error "VecUnpack operation not supported by TensorFlow 
 mkExp _ Case {} _      = error "Case operation not supported by TensorFlow backend."
 mkExp _ While {} _     = error "While operation not supported by TensorFlow backend."
 
--- mkExp env (While (Lam lhs (Body cond)) (Lam lhs' (Body body)) exp) (ArgArray _ (ArrayR sh t) gv gvb) 
---   | DeclareVars lhs'' w k <- declareVars $ buffersR $ expType cond
---   =
---   aletUnique lhs'' (desugarAlloc (ArrayR sh (expType cond)) (fromGrounds gv)) $
---   Alet (LeftHandSideWildcard TupRunit) TupRunit
---   (mkExp (weakenEnv w env) (Let lhs (weakenArrayInstr w exp) (weakenArrayInstr w cond)) (ArgArray Out (ArrayR sh (expType cond)) (weakenVars w gv) (k weakenId))) $
---   Awhile
---     TupRunit
---     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique (LeftHandSideWildcard TupRunit) (mkExp (weakenEnv w env) (Let lhs (weakenArrayInstr w exp) (weakenArrayInstr w cond)) (ArgArray Out (ArrayR sh (expType cond)) (weakenVars w gv) (k weakenId))) (Return _))))
---     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique (LeftHandSideWildcard TupRunit) (mkExp (weakenEnv w env) (Let lhs' (weakenArrayInstr w exp) (weakenArrayInstr w body)) (ArgArray Out (ArrayR sh t) (weakenVars w gv) (weakenVars w gvb))) (Return TupRunit))))
---     TupRunit
-
--- mkExp env (While (Lam lhs (Body cond)) (Lam lhs' (Body body)) exp) aOut@(ArgArray _ (ArrayR sh t) gv gvb) 
---   =
---   Awhile
---     TupRunit
---     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique lhs'' (Compute cond) (Return _))))
---     (Alam (LeftHandSideWildcard TupRunit) (Abody (aletUnique (LeftHandSideWildcard TupRunit) (mkExp env (Let lhs' exp body) aOut) (Return TupRunit))))
---     TupRunit
-
 mkExp _ _ _ = error "impossible"
 
 select :: TypeR t -> Arg env (In sh Word8) -> Arg env (In sh t) -> Arg env (In sh t) -> Arg env (Out sh t) -> PreOpenAcc TensorOp env ()
@@ -435,7 +413,7 @@ mkPrimFun (PrimQuot it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkBinary
 mkPrimFun (PrimRem it)  | OneOfDict <- tfModDict it                   = mkBinaryPrimFun TTruncateMod
 mkPrimFun (PrimQuotRem it)                                            = mkPrimFun2 (PrimQuot it) (PrimRem it)
 
-mkPrimFun (PrimIDiv it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkBinaryPrimFun TRealDiv
+mkPrimFun (PrimIDiv it) | OneOfDict <- tfNumDict (IntegralNumType it) = mkBinaryPrimFun TDiv
 mkPrimFun (PrimMod it)  | OneOfDict <- tfModDict it                   = mkBinaryPrimFun TTruncateMod
 
 mkPrimFun (PrimDivMod it)                                             = mkPrimFun2 (PrimIDiv it) (PrimMod it)
@@ -452,7 +430,7 @@ mkPrimFun (PrimPopCount it) | OneOfDict <- tfIntDict it               = undefine
 mkPrimFun (PrimCountLeadingZeros it) | OneOfDict <- tfIntDict it      = undefined
 mkPrimFun (PrimCountTrailingZeros it) | OneOfDict <- tfIntDict it     = undefined
 
-mkPrimFun (PrimFDiv ft) | OneOfDict <- tfNumDict (FloatingNumType ft) = mkBinaryPrimFun TRealDiv
+mkPrimFun (PrimFDiv ft) | OneOfDict <- tfNumDict (FloatingNumType ft) = mkBinaryPrimFun TDiv
 mkPrimFun (PrimRecip ft) | OneOfDict <- tfFloatDict ft                = mkUnaryPrimFun TReciprocal
 mkPrimFun (PrimSin ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TSin
 mkPrimFun (PrimCos ft) | OneOfDict <- tfFloatDict ft                  = mkUnaryPrimFun TCos
@@ -677,55 +655,3 @@ distributeBIdx (TupRsingle s) (TupRsingle (Var _ idx))
   = BIdx idx
 distributeBIdx (TupRpair l1 l2) (TupRpair r1 r2) = (distributeBIdx l1 r1, distributeBIdx l2 r2)
 distributeBIdx _ _ = error "impossible"
-
--- Examples of using the OperationAcc GADT for desugaring
-
--- add :: forall env sh. 
---        Arg env (In sh Int64) 
---     -> Arg env (In sh Int64) 
---     -> Arg env (Out sh Int64) 
---     -> OperationAcc TensorOp env ()
--- add argIn1 argIn2 argOut =
---   Exec TAdd (argIn1 :>: argIn2 :>: argOut :>: ArgsNil)
-
--- mapXTimesTwoPlusOne :: forall env sh. Arg env (In sh Int64) 
---   -> Arg env (Out sh Int64) -> OperationAcc TensorOp env ()
--- mapXTimesTwoPlusOne (ArgArray _ arrayR@(ArrayR _ t) gvIn gvbIn) argOut@(ArgArray _ _ _ gvbOut)
---   | DeclareVars lhs  w  k  <- declareVars $ buffersR t -- variable to new array
---   , DeclareVars lhs' w' k' <- declareVars $ buffersR t -- variable to new array
---   = let
---     sInt64 :: ScalarType Int64
---     sInt64 = SingleScalarType (NumSingleType (IntegralNumType TypeInt64))
---     in 
---     -- Allocate new array
---     aletUnique lhs (desugarAlloc arrayR (fromGrounds gvIn)) $
---     Alet (LeftHandSideWildcard TupRunit) TupRunit
---       (Exec -- Fill new array with the number 2
---         (TConstant sInt64 2) 
---         (ArgArray Out arrayR (weakenVars w gvIn) (k weakenId) :>: ArgsNil)
---       ) $
---       Alet (LeftHandSideWildcard TupRunit) TupRunit
---         (Exec -- (*2) Multiply input array with new array
---           TMul
---           (ArgArray In arrayR (weakenVars w gvIn) (weakenVars w gvbIn) :>:
---            ArgArray In arrayR (weakenVars w gvIn) (k weakenId) :>:
---            weaken w argOut :>: 
---            ArgsNil
---           )
---         ) $
---         -- Allocate new array
---         aletUnique lhs' (desugarAlloc arrayR (fromGrounds (weakenVars w gvIn))) $
---           Alet (LeftHandSideWildcard TupRunit) TupRunit
---             (Exec -- Fill new array with the number 1
---               (TConstant sInt64 1) 
---               (ArgArray Out arrayR (weakenVars (w' .> w) gvIn) (k' weakenId) :>:
---                ArgsNil
---               )
---             ) $
---            Exec -- (+1) Add new array to the result array of (*2)
---              TAdd 
---              (ArgArray In arrayR (weakenVars (w' .> w) gvIn) (weakenVars (w' .> w) gvbOut) :>: 
---               ArgArray In arrayR (weakenVars (w' .> w) gvIn) (k' weakenId) :>: 
---               weaken (w' .> w) argOut :>: 
---               ArgsNil
---              )

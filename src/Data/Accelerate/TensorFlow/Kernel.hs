@@ -76,7 +76,7 @@ data TensorKernel env where
   -- operators from Integral
   TensorTruncateDiv :: OneOf TFNum a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
   TensorTruncateMod :: OneOf TFMod a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
-  TensorRealDiv     :: OneOf TFNum a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
+  TensorDiv         :: OneOf TFNum a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
 
   -- operators from Bits & FiniteBits
   TensorBitwiseAnd :: OneOf TFInt a => TensorArg env sh a -> TensorArg env sh a -> TensorArg env sh a -> TensorKernel env
@@ -181,7 +181,7 @@ compileOperation TSign (aIn :>: aOut :>: _)                                 = Te
 
 compileOperation TTruncateDiv (aIn1 :>: aIn2 :>: aOut :>: _)                = TensorTruncateDiv (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TTruncateMod (aIn1 :>: aIn2 :>: aOut :>: _)                = TensorTruncateMod (arg aIn1) (arg aIn2) (arg aOut)
-compileOperation TRealDiv (aIn1 :>: aIn2 :>: aOut :>: _)                    = TensorRealDiv (arg aIn1) (arg aIn2) (arg aOut)
+compileOperation TDiv (aIn1 :>: aIn2 :>: aOut :>: _)                        = TensorDiv (arg aIn1) (arg aIn2) (arg aOut)
 
 compileOperation TBitwiseAnd (aIn1 :>: aIn2 :>: aOut :>: _)                 = TensorBitwiseAnd (arg aIn1) (arg aIn2) (arg aOut)
 compileOperation TBitwiseOr (aIn1 :>: aIn2 :>: aOut :>: _)                  = TensorBitwiseOr (arg aIn1) (arg aIn2) (arg aOut)

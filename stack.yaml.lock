@@ -109,6 +109,13 @@ packages:
       size: 3124
   original:
     hackage: optparse-applicative-0.18.1.0
+- completed:
+    hackage: microlens-0.4.12.0@sha256:2d799d17c9e36fb5a62fbed1f07231cf5e423d9d82ac24b5137263bcef1cc4ed,4520
+    pantry-tree:
+      sha256: 86f299089b5ca23186e7e59d0804820e5ca09d5155ac43108b28282bd5d3caf3
+      size: 461
+  original:
+    hackage: microlens-0.4.12.0
 snapshots:
 - completed:
     sha256: ce4fb8d44f3c6c6032060a02e0ebb1bd29937c9a70101c1517b92a87d9515160
