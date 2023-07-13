@@ -15,14 +15,37 @@ import Data.Array.Accelerate (Vector)
 import Data.Array.Accelerate.Data.Ratio (Ratio)
 import Data.Accelerate.TensorFlow.Operation ()
 import Data.Accelerate.TensorFlow.Desugar ()
-import Data.Accelerate.TensorFlow.Kernel ()
+import Data.Accelerate.TensorFlow.Kernel (TensorKernel)
 import Data.Array.Accelerate.Pretty.Schedule ()
-import Data.Array.Accelerate.AST.Schedule.Sequential ()
+import Data.Array.Accelerate.AST.Schedule.Sequential (SequentialSchedule)
 import Data.Array.Accelerate.Pretty.Schedule.Sequential ()
 import Lens.Micro ( Lens', lens )
 
 type Stencil5x1 a = (Stencil3 a, Stencil5 a, Stencil3 a)
 type Stencil1x5 a = (Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a, Stencil3 a)
+
+histogram :: Acc (Vector Int) -> Acc (Vector Int)
+histogram xs =
+  let zeros = fill (constant (Z :. 10)) 0
+      ones  = fill (shape xs) 1
+  in
+  permute (+) zeros (\ix -> Just_ (I1 (xs!ix))) ones
+-- const2d' :: Num a => Exp Int -> Acc (Matrix a)
+-- const2d' n =
+--   let zeros = fill (I2 n n) 0
+--       ones  = fill (I2 n n)   1
+--   in
+--   permute const zeros (\(I2 i j) -> Just_ (I2 i j)) ones
+
+tPermute :: TestTree
+tPermute = testGroup "permute"
+            [ testCase "histogram" $ assertAcc $ histogram (use (fromList (Z :. 20) [0,0,1,2,1,1,2,4,8,3,4,9,8,3,2,5,5,3,1,2] :: Vector Int))
+              --testCase "const2d" $ assertAcc (const2d' 5 :: Acc (Matrix Int64))
+            ]
+
+main :: IO ()
+main = do putStrLn $ test @SequentialSchedule @TensorKernel $ histogram
+          defaultMain tPermute
 
 -- Lenses
 -- ------
@@ -41,8 +64,8 @@ _3 :: forall sh. Elt sh => Lens' (Exp (sh:.Int:.Int:.Int)) (Exp Int)
 _3 = lens (\(ix :: Exp (sh :. Int :. Int :. Int))   -> let _  :. z :. _ :. _ = unlift ix :: Exp sh :. Exp Int :. Exp Int :. Exp Int in z)
           (\ix z -> let sh :. _ :. y :. x = unlift ix :: Exp sh :. Exp Int :. Exp Int :. Exp Int in lift (sh :. z :. y :. x))
 
-main :: IO ()
-main = defaultMain tests
+-- main :: IO ()
+-- main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "tests"
@@ -195,7 +218,7 @@ tAccelerateArrayLanguage = testGroup "The Accelerate Array Language"
                   where tPlusPlus = testGroup "++"
                           [ testCase "++" $ assertAcc (use (fromList (Z:.5:.10) [0..]) ++ use (fromList (Z:.10:.3) [0..]) :: Acc (Array DIM2 Int64))
                           ]
-                        tConcatOn = let 
+                        tConcatOn = let
                               m1 = fromList (Z:.5:.10) [0..] :: Matrix Int64
                               m2 = fromList (Z:.10:.5) [0..] :: Matrix Int64
                             in testGroup "concatOn"

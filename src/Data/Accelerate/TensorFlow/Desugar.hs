@@ -149,14 +149,12 @@ instance DesugarAcc TensorOp where
       )
 
   mkPermute :: Arg env (Fun' (e -> e -> e)) -> Arg env (Mut sh' e) -> Arg env (Fun' (sh -> PrimMaybe sh')) -> Arg env (In sh e) -> OperationAcc TensorOp env ()
-  mkPermute
-    (ArgFun comb)
-    (ArgArray _ (ArrayR sh' _) gv' gvb')
-    perm
+  mkPermute (ArgFun comb) (ArgArray _ (ArrayR sh' _) gv' gvb') perm
     (ArgArray _ (ArrayR sh t) gv gvb)
     | TensorTypeDict                     <- tfTensorTypeDict' t
     , OneOfDict                          <- tfAllDict' t
-    , maybeSh'                           <- TupRpair (TupRsingle scalarTypeWord8) (TupRpair TupRunit (shapeType sh'))
+    , maybeSh'                           <- TupRpair (TupRsingle scalarTypeWord8) 
+                                                     (TupRpair TupRunit (shapeType sh'))
     , DeclareVars lhs w k                <- declareVars $ buffersR maybeSh'
     , DeclareVars lhs' w' k'             <- declareVars $ TupRsingle $ GroundRscalar scalarTypeInt
     , DeclareVars lhs'' w'' k''          <- declareVars $ buffersR (shapeType sh')
@@ -168,45 +166,48 @@ instance DesugarAcc TensorOp where
     = -- 1) Create an array of maybeSh' with perm
       aletUnique lhs (desugarAlloc (ArrayR sh maybeSh') (fromGrounds gv)) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (mkGenerate
-        (weaken w perm)
+      (mkGenerate (weaken w perm)
         (ArgArray Out (ArrayR sh maybeSh') (weakenVars w gv) (k weakenId))
-      ) $
-      -- 2) To apply boolean mask (filter) with 1D arrays, we need to flatten. Calculate the dim1 size.
+      ) $ -- 2) To apply filter with 1D arrays, we need to flatten. Calculate the dim1 size
       aletUnique lhs' (Compute (ShapeSize sh (paramsIn' $ weakenVars w $ fromGrounds gv))) $
-      -- 3) Get 1D array of indices (sh'), by filtering with predicate isJust and map with fromJust.
-      aletUnique lhs'' (desugarAlloc (ArrayR sh (shapeType sh')) (fromGrounds (weakenVars (w' .> w) gv))) $
+      -- 3) Get 1D array of indices (sh'): filter with isJust and map with fromJust.
+      aletUnique lhs'' (desugarAlloc (ArrayR sh (shapeType sh'))
+        (fromGrounds (weakenVars (w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (booleanMask (shapeType sh')
-        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (TupRpair TupRunit (k' w'')) (isJust (TupRpair TupRunit (shapeType sh')) (k (w'' .> w'))))
-        (fromJust (shapeType sh') (k (w'' .> w')))
-        (k'' weakenId)
-      ) $
-      -- 4) Get 1D array of updates by filtering with predicate isJust.
-      aletUnique lhs''' (desugarAlloc (ArrayR sh t) (fromGrounds (weakenVars (w'' .> w' .> w) gv))) $
+      (booleanMask (shapeType sh') (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) 
+          (TupRpair TupRunit (k' w'')) 
+          (isJust (TupRpair TupRunit (shapeType sh')) (k (w'' .> w'))))
+        (fromJust (shapeType sh') (k (w'' .> w'))) (k'' weakenId)
+      ) $ -- 4) Get 1D array of updates by filtering with predicate isJust.
+      aletUnique lhs''' (desugarAlloc (ArrayR sh t) 
+        (fromGrounds (weakenVars (w'' .> w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit 
-      (booleanMask t
-        (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) (TupRpair TupRunit (k' (w''' .> w''))) (isJust (TupRpair TupRunit (shapeType sh')) (k (w''' .> w'' .> w'))))
-        (weakenVars (w''' .> w'' .> w' .> w) gvb)
-        (k''' weakenId) 
-      ) $
-      -- 5) Map array of indices (sh') with toIndex to obtain 1D array of flattened indices.
-      aletUnique lhs'''' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt)) (fromGrounds (weakenVars (w''' .> w'' .> w' .> w) gv))) $
+      (booleanMask t (ArgArray In (ArrayR dim1 (TupRsingle scalarTypeWord8)) 
+          (TupRpair TupRunit (k' (w''' .> w''))) 
+          (isJust (TupRpair TupRunit (shapeType sh')) (k (w''' .> w'' .> w'))))
+        (weakenVars (w''' .> w'' .> w' .> w) gvb) (k''' weakenId) 
+      ) $ -- 5) Map array of indices (sh') with toIndex to obtain 1D array of flattened indices.
+      aletUnique lhs'''' (desugarAlloc (ArrayR sh (TupRsingle scalarTypeInt))
+        (fromGrounds (weakenVars (w''' .> w'' .> w' .> w) gv))) $
       Alet (LeftHandSideWildcard TupRunit) TupRunit
-      (mkMap
-        (ArgFun $ Lam lhsSh' $ Body (Let lhsSh'' (paramsIn' $ fromGrounds (weakenVars (w'''' .> w''' .> w'' .> w' .> w) gv')) $ toIndex sh' (kSh'' weakenId) (kSh' wSh'')))
-        (ArgArray In (ArrayR dim1 (shapeType sh')) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'' (w'''' .> w''')))
-        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId))
-      ) $
-      -- 4) Compute linearised index of input shape
-      aletUnique lhs''''' (Compute (ShapeSize sh' (paramsIn' $ weakenVars (w'''' .> w''' .> w'' .> w' .> w) $ fromGrounds gv'))) $
-      -- 5) Apply tensor scatter to 1D array of source values, 1D array of flattened indices and 1D array of updates.
+      (mkMap (ArgFun $ Lam lhsSh' $ Body (Let lhsSh'' 
+        (paramsIn' $ fromGrounds (weakenVars (w'''' .> w''' .> w'' .> w' .> w) gv')) $
+          toIndex sh' (kSh'' weakenId) (kSh' wSh'')))
+        (ArgArray In (ArrayR dim1 (shapeType sh')) 
+          (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'' (w'''' .> w''')))
+        (ArgArray Out (ArrayR dim1 (TupRsingle scalarTypeInt)) 
+          (TupRpair TupRunit (k' (w'''' .> w''' .> w''))) (k'''' weakenId))
+      ) $ -- 6) Compute linearised index of input shape
+      aletUnique lhs''''' (Compute (ShapeSize sh' 
+        (paramsIn' $ weakenVars (w'''' .> w''' .> w'' .> w' .> w) $ fromGrounds gv'))) $
+      -- 7) Apply tensor scatter to source values, flattened indices and updates.
       Exec (TTensorScatter scatterFun) (
-        ArgArray Mut (ArrayR dim1 t) (TupRpair TupRunit (k''''' weakenId)) (weakenVars (w''''' .> w'''' .> w''' .> w'' .> w' .> w) gvb') :>:
-        ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit (k' (w''''' .> w'''' .> w''' .> w''))) (k'''' w''''') :>:
-        ArgArray In (ArrayR dim1 t) (TupRpair TupRunit (k' (w''''' .> w'''' .> w''' .> w''))) (k''' (w''''' .> w'''')) :>:
-        ArgsNil
-      )
+        ArgArray Mut (ArrayR dim1 t) (TupRpair TupRunit (k''''' weakenId)) 
+          (weakenVars (w''''' .> w'''' .> w''' .> w'' .> w' .> w) gvb') :>:
+        ArgArray In (ArrayR dim1 (TupRsingle scalarTypeInt)) (TupRpair TupRunit 
+          (k' (w''''' .> w'''' .> w''' .> w''))) (k'''' w''''') :>:
+        ArgArray In (ArrayR dim1 t) (TupRpair TupRunit 
+          (k' (w''''' .> w'''' .> w''' .> w''))) (k''' (w''''' .> w'''')) :>: ArgsNil)
         where
           isJust :: TypeR a -> GroundVars env (Buffers (Word8, a)) -> GroundVars env (Buffers Word8)
           isJust _ (TupRpair word8 _) = word8

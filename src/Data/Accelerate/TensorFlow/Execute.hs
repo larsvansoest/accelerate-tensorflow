@@ -37,7 +37,7 @@ import Data.Array.Accelerate.AST.Schedule
 import Data.Array.Accelerate.Representation.Type
     ( TupR(..), TypeR, mapTupR )
 import Data.Accelerate.TensorFlow.Type
-    ( VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict, toType64, toType64', fromType64' )
+    ( VectorType, Type64, VectorTypeDict (..), tfVectorTypeDict, toType64, toType64', fromType64', TFFloat )
 import Data.IORef ( IORef, newIORef, readIORef, writeIORef )
 import Data.Array.Accelerate.Type ( ScalarType, Int64, Int32 )
 import Data.Array.Accelerate.Array.Buffer
@@ -78,7 +78,7 @@ import Data.Data ( type (:~:)(Refl) )
 import Data.Array.Accelerate.Pretty.Operation (prettyBuffer)
 import qualified Data.Array.Accelerate.Pretty as Pretty
 import Data.Array.Accelerate.Representation.Elt (showElt)
-import Data.Vector (Vector)
+import TensorFlow.Types (OneOf)
 
 data TensorFlow where
   TensorFlow :: TensorFlow
@@ -106,6 +106,24 @@ input (TupRsingle (GroundRscalar st)) s = TupRsingle $ Scalar (TupRsingle st) s
 input (TupRsingle (GroundRbuffer _)) _ = undefined -- TupRsingle $ Scalar (TupRsingle st) s -- dit in IO zetten (FullIOFun)
 input (TupRpair _ _) _ = error "impossible"
 input TupRunit _ = TupRunit
+
+quadratic :: (OneOf TFFloat a, Num a) 
+          => TF.Tensor v a 
+          -> TF.Tensor v a 
+          -> TF.Tensor v a 
+          -> (TF.Tensor TF.Build a, TF.Tensor TF.Build a)
+quadratic a b c = (
+  TF.div 
+    (TF.add 
+      (TF.neg b) 
+      (TF.sqrt (TF.sub (TF.mul b b) (TF.mul (TF.scalar 4) (TF.mul a c))))) 
+    (TF.mul (TF.scalar 2) a), 
+  TF.div 
+    (TF.sub 
+      (TF.neg b) 
+      (TF.sqrt (TF.sub (TF.mul b b) (TF.mul (TF.scalar 4) (TF.mul a c))))) 
+    (TF.mul (TF.scalar 2) a) 
+  )
 
 type TensorEnv = Env TensorElement
 
