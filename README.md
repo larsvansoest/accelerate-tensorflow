@@ -1,16 +1,11 @@
 # Accelerate Tensorflow
-An extension to Accelerate to embed calculations in TensorFlow.
+This repository contains the source code for my Master thesis research.
+
+## Thesis Abstract
+Hardware acceleration is the method of accelerating calculations with hardware specifically designed for the type of calculations. Accelerate and TensorFlow are libraries that make this accessible to many programmers, but these libraries differ in the level of abstraction and targeted hardware. This thesis investigates the possibility of compiling and executing Accelerate programs in TensorFlow. A compiler is introduced that converts second-order Accelerate programs to first-order TensorFlow graphs, covering 68% of the Accelerate language.
 
 ## Running the project locally
 This repository was developed on a Unix-based system (Ubuntu with WSL 2) using VSCode Remote (ssh / wsl2). The installation instructions below include steps to run and develop the project.
-
-#### GPU (Nvidia)
-In order to run TensorFlow on a Nvidia GPU, follow the guide below to install cuDNN 8.1.1.33 and CUDA 11.2.
-- https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html
-  > On Ubuntu 20.04, running the script `scripts/ubuntu2004/install-cudnn.sh` should cover the guide.
-- https://docs.nvidia.com/cuda/cuda-installation-guide-linux
-  > Preferably: download the 11.2.0 CUDA toolkit here: https://developer.nvidia.com/cuda-11.2.0-download-archive
-  > Otherwise, for Ubuntu 20.04, running the script `scripts/ubuntu2004/install-cuda.sh` should cover the guide.
 
 ### Setting up the project
 1. Clone the repository with `git clone git@github.com:larsvansoest/accelerate-tensorflow.git`
@@ -21,6 +16,14 @@ In order to run TensorFlow on a Nvidia GPU, follow the guide below to install cu
 
 3. Make sure `unzip` is installed. Then run `scripts/install.sh`.
   > Run with flag `-g` to switch to TensorFlow for GPU.
+
+#### GPU (Nvidia)
+In order to run TensorFlow on a Nvidia GPU, follow the guide below to install cuDNN 8.1.1.33 and CUDA 11.2.
+- https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html
+  > On Ubuntu 20.04, running the script `scripts/ubuntu2004/install-cudnn.sh` should cover the guide.
+- https://docs.nvidia.com/cuda/cuda-installation-guide-linux
+  > Preferably: download the 11.2.0 CUDA toolkit here: https://developer.nvidia.com/cuda-11.2.0-download-archive
+  > Otherwise, for Ubuntu 20.04, running the script `scripts/ubuntu2004/install-cuda.sh` should cover the guide.
 
 ### Running the project
 Unless using Gurobi, make sure `coinor-cbc, zlib1g-dev, libgl1-mesa-dev freeglut3{,-dev} libsnappy-dev` are installed. To run the project, run the script `scripts/test.sh`.
